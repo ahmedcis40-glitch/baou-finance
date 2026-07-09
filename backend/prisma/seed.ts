@@ -36,38 +36,23 @@ async function main() {
 
   const passwordHash = await bcrypt.hash('password123', 10);
 
-  // 1. Create SGI KYC Agent
-  const kycAgent = await prisma.user.create({
+  // 1. Create SGI Admin (KYC & Management role)
+  const adminUser = await prisma.user.create({
     data: {
-      email: 'kyc_agent@sgi.ci',
+      email: 'admin@sgi.ci',
       password: passwordHash,
-      firstName: 'Koffi',
-      lastName: 'Kouassi',
+      firstName: 'Directeur',
+      lastName: 'SGI',
       phone: '+2250707070701',
       role: Role.ADMIN_KYC,
       kycStatus: KYCStatus.APPROUVE,
       consentSMS: true,
     },
   });
-  console.log(`Seeded KYC Agent: ${kycAgent.email}`);
+  console.log(`Seeded Admin User: ${adminUser.email}`);
 
-  // 2. Create SGI Trader
-  const trader = await prisma.user.create({
-    data: {
-      email: 'trader@sgi.ci',
-      password: passwordHash,
-      firstName: 'Awa',
-      lastName: 'Bakayoko',
-      phone: '+2250707070702',
-      role: Role.TRADER,
-      kycStatus: KYCStatus.APPROUVE,
-      consentSMS: true,
-    },
-  });
-  console.log(`Seeded Trader: ${trader.email}`);
-
-  // 3. Create an active Client with cash wallet and securities wallet
-  const activeClient = await prisma.user.create({
+  // 2. Create SGI Client with cash wallet and securities wallet
+  const clientUser = await prisma.user.create({
     data: {
       email: 'client@sgi.ci',
       password: passwordHash,
@@ -94,29 +79,9 @@ async function main() {
       },
     },
   });
-  console.log(`Seeded Active Client: ${activeClient.email}`);
+  console.log(`Seeded Client User: ${clientUser.email}`);
 
-  // 4. Create a pending Client (without cash/securities yet)
-  const pendingClient = await prisma.user.create({
-    data: {
-      email: 'pending_client@sgi.ci',
-      password: passwordHash,
-      firstName: 'Amadou',
-      lastName: 'Diallo',
-      phone: '+2250707070704',
-      role: Role.CLIENT,
-      kycStatus: KYCStatus.EN_ATTENTE_VALIDATION,
-      consentSMS: true,
-      kycDocuments: JSON.stringify({
-        identityCardUrl: 'http://localhost:3000/docs/cni_amadou.pdf',
-        ribUrl: 'http://localhost:3000/docs/rib_amadou.pdf',
-        proofOfAddressUrl: 'http://localhost:3000/docs/domicile_amadou.pdf',
-      }),
-    },
-  });
-  console.log(`Seeded Pending Client: ${pendingClient.email}`);
-
-  console.log('Database seeding completed successfully.');
+  console.log('Database seeding completed successfully. Only 1 Client and 1 Admin accounts generated.');
 }
 
 main()
