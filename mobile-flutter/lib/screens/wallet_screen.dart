@@ -75,14 +75,14 @@ class _WalletScreenState extends State<WalletScreen> {
                 try {
                   await api.simulateWebhook(idInternal, 'SUCCESS', amount);
                   _loadData();
-                  if (ctx.mounted) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Dépôt validé avec succès via Webhook PawaPay !')),
                     );
                   }
                 } catch (err) {
-                  if (ctx.mounted) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('Erreur: $err')),
                     );
                   }
