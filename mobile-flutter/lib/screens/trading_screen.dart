@@ -206,7 +206,7 @@ class _TradingScreenState extends State<TradingScreen> {
 
   Widget _buildCalcRow(String label, String val, {bool isBold = false, Color? color}) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.between,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label, style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
         Text(
