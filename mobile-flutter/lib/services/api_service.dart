@@ -6,7 +6,7 @@ import '../models/wallet.dart';
 import '../models/order.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://10.0.2.2:3000'; // 10.0.2.2 points to localhost in Android Emulator
+  static const String baseUrl = 'https://baou-finance.onrender.com';
   String? _token;
 
   Future<String?> _getToken() async {
