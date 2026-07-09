@@ -11,7 +11,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     
     if (dbUrl.startsWith('postgresql://') || dbUrl.startsWith('postgres://')) {
       console.log('Database configuration: PostgreSQL pool adapter activated.');
-      const pool = new Pool({ connectionString: dbUrl });
+      const pool = new Pool({ 
+        connectionString: dbUrl,
+        ssl: { rejectUnauthorized: false }
+      });
       const adapter = new PrismaPg(pool);
       return { adapter };
     } else {

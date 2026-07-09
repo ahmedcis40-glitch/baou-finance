@@ -11,7 +11,10 @@ let prisma: PrismaClient;
 
 if (dbUrl.startsWith('postgresql://') || dbUrl.startsWith('postgres://')) {
   console.log('Seed configuration: PostgreSQL pool adapter activated.');
-  const pool = new Pool({ connectionString: dbUrl });
+  const pool = new Pool({ 
+    connectionString: dbUrl,
+    ssl: { rejectUnauthorized: false }
+  });
   const adapter = new PrismaPg(pool);
   prisma = new PrismaClient({ adapter });
 } else {
