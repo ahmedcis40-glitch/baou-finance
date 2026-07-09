@@ -1,0 +1,261 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../services/api_service.dart';
+import '../models/wallet.dart';
+
+class WalletScreen extends StatefulWidget {
+  const WalletScreen({super.key});
+
+  @override
+  State<WalletScreen> createState() => _WalletScreenState();
+}
+
+class _WalletScreenState extends State<WalletScreen> {
+  CashWallet? _cashWallet;
+  List<SecuritiesWallet> _securities = [];
+  bool _loading = false;
+  final _amountController = TextEditingController(text: '100000');
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    setState(() => _loading = true);
+    final api = context.read<ApiService>();
+    try {
+      final cash = await api.getCashWallet();
+      final sec = await api.getSecuritiesWallet();
+      setState(() {
+        _cashWallet = cash;
+        _securities = sec;
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur de chargement: $e')),
+      );
+    } finally {
+      setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _initiatePawaPayDeposit() async {
+    final api = context.read<ApiService>();
+    final amount = double.tryParse(_amountController.text) ?? 0;
+    if (amount <= 0) return;
+
+    try {
+      final result = await api.initiateDeposit(amount);
+      final idInternal = result['transactionId'];
+
+      // Show mock USSD/payment success validation modal
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Validation PawaPay (Wave/Orange/MTN)'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Montant à payer: ${amount.toStringAsFixed(0)} XOF'),
+              const SizedBox(height: 12),
+              const Text(
+                'Saisissez votre code PIN Mobile Money pour valider le dépôt. (Simule le Webhook PawaPay)',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                // Simulate Webhook success call
+                try {
+                  await api.simulateWebhook(idInternal, 'SUCCESS', amount);
+                  _loadData();
+                  if (ctx.mounted) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(content: Text('Dépôt validé avec succès via Webhook PawaPay !')),
+                    );
+                  }
+                } catch (err) {
+                  if (ctx.mounted) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      SnackBar(content: Text('Erreur: $err')),
+                    );
+                  }
+                }
+              },
+              child: const Text('Confirmer le PIN (Succès)', style: TextStyle(color: Colors.greenAccent)),
+            ),
+          ],
+        ),
+      );
+
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur dépôt: $e')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Cash card
+            Card(
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: const BorderRadius.all(Radius.circular(16)),
+                  gradient: LinearGradient(
+                    colors: [Colors.indigo.shade900.withOpacity(0.6), Colors.purple.shade900.withOpacity(0.4)],
+                  ),
+                ),
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Portefeuille Cash SGI', style: TextStyle(color: Colors.indigoAccent, fontSize: 13)),
+                    const SizedBox(height: 12),
+                    Text(
+                      '${_cashWallet?.balanceTotal.toStringAsFixed(0) ?? "0"} XOF',
+                      style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                    ),
+                    const Text('Solde Cash Total', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                    const SizedBox(height: 16),
+                    const Divider(color: Colors.white24),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildBalanceDetails(
+                          Icons.lock_outline, 
+                          'Gelé (en bourse)', 
+                          '${_cashWallet?.balanceFrozen.toStringAsFixed(0) ?? "0"} F',
+                          Colors.amberAccent
+                        ),
+                        _buildBalanceDetails(
+                          Icons.lock_open, 
+                          'Disponible', 
+                          '${_cashWallet?.balanceAvailable.toStringAsFixed(0) ?? "0"} F',
+                          Colors.greenAccent
+                        ),
+                      ],
+                    )
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // PawaPay MM Deposit button trigger
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Recharger via PawaPay (Wave, Orange, MTN)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _amountController,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Montant (XOF)',
+                              border: OutlineInputBorder(),
+                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        ElevatedButton.icon(
+                          onPressed: _initiatePawaPayDeposit,
+                          icon: const Icon(Icons.send_rounded, size: 16),
+                          label: const Text('Déposer'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green.shade700,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          ),
+                        )
+                      ],
+                    )
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Securities card
+            const Text(
+              'Mes Actions BRVM',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
+            ),
+            const SizedBox(height: 12),
+            if (_loading)
+              const Center(child: CircularProgressIndicator())
+            else if (_securities.isEmpty)
+              const Card(
+                child: Padding(
+                  padding: EdgeInsets.all(24.0),
+                  child: Text('Aucune action en portefeuille.', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey)),
+                ),
+              )
+            else
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _securities.length,
+                itemBuilder: (ctx, idx) {
+                  final sec = _securities[idx];
+                  return Card(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: ListTile(
+                      title: Text(sec.codeValeur, style: const TextStyle(fontWeight: FontWeight.bold, fontFamily: 'monospace')),
+                      subtitle: Text('PMP: ${sec.averageBuyPrice.toStringAsFixed(0)} XOF'),
+                      trailing: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text('${sec.quantity}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.indigoAccent)),
+                          const Text('Actions', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              )
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBalanceDetails(IconData icon, String label, String value, Color color) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 4),
+            Text(label, style: const TextStyle(color: Colors.grey, fontSize: 11)),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(value, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: color)),
+      ],
+    );
+  }
+}

@@ -1,0 +1,177 @@
+@import "tailwindcss";
+
+:root {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #f1f5f9;
+  
+  --ci-orange: #ff8200;
+  --ci-green: #009e49;
+  --ci-white: #ffffff;
+  
+  --indigo-500: #ff8200;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-primary) !important;
+  color: #0f172a !important;
+  font-family: 'Inter', sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Override dark simulator styles with Ivory Coast light theme */
+.bg-\[\#07080c\] {
+  background-color: #f8fafc !important; /* Outer page container */
+}
+
+/* Simulated Smartphone body */
+.bg-\[\#0c0d14\] {
+  background-color: #ffffff !important;
+  box-shadow: 0 25px 60px rgba(15, 23, 42, 0.08) !important;
+}
+
+.border-\[\#222431\], .bg-\[\#222431\] {
+  border-color: #ff8200 !important; /* Sleek Orange Smartphone border! */
+  background-color: #ff8200 !important; /* Notch Orange */
+}
+
+/* Smartphone screen background */
+.bg-\[\#090a10\] {
+  background-color: #ffffff !important; /* Phone screen */
+}
+
+/* Sub-card wrappers & inputs inside phone screen */
+.bg-\[\#11121b\], .bg-gray-900, .bg-gray-800\/80 {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+.bg-\[\#11121b\], .bg-\[\#090a10\] {
+  background-color: #f8fafc !important;
+}
+
+/* Borders */
+.border-gray-800, .border-gray-700, .border-gray-850 {
+  border-color: #e2e8f0 !important;
+}
+
+/* Inputs on mobile */
+input, select {
+  background-color: #ffffff !important;
+  border: 2px solid #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+input:focus, select:focus {
+  border-color: #ff8200 !important;
+  box-shadow: 0 0 0 3px rgba(255, 130, 0, 0.15) !important;
+}
+
+/* Text coloring overrides inside screen */
+.text-gray-100, .text-gray-200, .text-gray-300 {
+  color: #0f172a !important;
+}
+
+.text-gray-400, .text-gray-500 {
+  color: #475569 !important;
+}
+
+/* Button & primary accents */
+.bg-indigo-600 {
+  background: linear-gradient(135deg, #ff8200 0%, #ff9f3b 100%) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(255, 130, 0, 0.25) !important;
+}
+
+.bg-indigo-600:hover {
+  background: #ff8200 !important;
+}
+
+.text-indigo-400 {
+  color: #ff8200 !important;
+}
+
+.text-indigo-300 {
+  color: #009e49 !important;
+}
+
+.bg-indigo-500\/10 {
+  background-color: rgba(255, 130, 0, 0.08) !important;
+  color: #ff8200 !important;
+}
+
+.border-indigo-500\/20, .border-indigo-500\/30 {
+  border-color: rgba(255, 130, 0, 0.15) !important;
+}
+
+/* Mobile money specific colors */
+.from-indigo-900\/60, .to-purple-900\/40, .from-purple-900\/60, .to-pink-900\/40 {
+  background: linear-gradient(135deg, rgba(255, 130, 0, 0.06) 0%, rgba(0, 158, 73, 0.04) 100%) !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
+}
+
+.text-indigo-300, .text-purple-300 {
+  color: #ff8200 !important;
+}
+
+.text-indigo-200\/70, .text-purple-200\/70 {
+  color: #475569 !important;
+}
+
+.bg-indigo-500\/30 {
+  background-color: rgba(255, 130, 0, 0.15) !important;
+  color: #ff8200 !important;
+  border-color: rgba(255, 130, 0, 0.25) !important;
+}
+
+.bg-purple-500\/30 {
+  background-color: rgba(0, 158, 73, 0.1) !important;
+  color: #009e49 !important;
+  border-color: rgba(0, 158, 73, 0.15) !important;
+}
+
+/* Green status indicators */
+.text-green-400 {
+  color: #009e49 !important;
+}
+
+.bg-green-500\/10 {
+  background-color: rgba(0, 158, 73, 0.08) !important;
+}
+
+/* Hide scrollbars globally */
+::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+* {
+  scrollbar-width: none;
+  box-sizing: border-box;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .5; }
+}
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.animate-spin {
+  animation: spin 1s linear infinite;
+}

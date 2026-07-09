@@ -1,0 +1,146 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum Role {
+  CLIENT
+  ADMIN_KYC
+  TRADER
+}
+
+enum KYCStatus {
+  EN_ATTENTE_VALIDATION
+  APPROUVE
+  REJETE
+}
+
+enum OrderType {
+  ACHAT
+  VENTE
+}
+
+enum OrderStatus {
+  EN_ATTENTE
+  EN_TRAITEMENT
+  EXECUTE
+  ANNULE
+}
+
+enum PawaPayTxStatus {
+  EN_COURS
+  SUCCES
+  ECHEC
+}
+
+enum PawaPayTxType {
+  DEPOT
+  RETRAIT
+}
+
+model User {
+  id                  String               @id @default(uuid())
+  email               String               @unique
+  password            String
+  firstName           String
+  lastName            String
+  phone               String               @unique
+  whatsappPhone       String?
+  role                Role                 @default(CLIENT)
+  kycStatus           KYCStatus            @default(EN_ATTENTE_VALIDATION)
+  kycDocuments        String?              // JSON string representing files / details
+  consentSMS          Boolean              @default(true)
+  consentWhatsApp     Boolean              @default(true)
+  investorProfile     String?              @default("MODERE")
+  investorHorizon     String?              @default("MOYEN_TERME")
+  investorObjective   String?              @default("EPARGNE")
+  sgiPartenaire       String?              @default("Société Générale Capital Securities")
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  
+  cashWallet          CashWallet?
+  securitiesWallet    SecuritiesWallet[]
+  orders              Order[]
+  pawapayTransactions PawaPayTransaction[]
+  dcaPlans            DcaPlan[]
+  auditLogs           AuditLog[]
+}
+
+model CashWallet {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  balanceTotal    Float    @default(0.0) // Total cash (Available + Frozen)
+  balanceFrozen   Float    @default(0.0) // Frozen cash for pending orders
+  currency        String   @default("XOF")
+  updatedAt       DateTime @updatedAt
+}
+
+model SecuritiesWallet {
+  id               String   @id @default(uuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeValeur       String   // e.g., SNTS (Sonatel), CIEC (CIE)
+  quantity         Int      @default(0)
+  averageBuyPrice  Float    @default(0.0)
+  updatedAt        DateTime @updatedAt
+
+  @@unique([userId, codeValeur])
+}
+
+model Order {
+  id                String      @id @default(uuid())
+  userId            String
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type              OrderType
+  codeValeur        String      // e.g., SNTS
+  quantityRequested Int
+  priceRequested    Float
+  priceReal         Float?      // To be entered by SGI trader upon execution
+  status            OrderStatus @default(EN_ATTENTE)
+  sgiPartenaireId   String?     // SGI partner that received the order
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+}
+
+model PawaPayTransaction {
+  idInternal       String          @id @default(uuid())
+  idPawaPay        String?         @unique // Transaction ID returned by PawaPay API
+  userId           String
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount           Float
+  type             PawaPayTxType
+  status           PawaPayTxStatus @default(EN_COURS)
+  webhookSignature String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+}
+
+model DcaPlan {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  symbol    String   // e.g. SNTS
+  amount    Float    // Montant à investir périodiquement
+  frequency String   // "WEEKLY" | "MONTHLY" | "QUARTERLY"
+  status    String   // "ACTIVE" | "SUSPENDED"
+  nextRun   DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?  // Acting user (Admin/Trader)
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String   // e.g. "KYC_APPROVAL", "ORDER_EXECUTION", etc.
+  details   String   // JSON string of modifications or action details
+  ipAddress String
+  createdAt DateTime @default(now())
+}
