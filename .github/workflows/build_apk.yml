@@ -29,7 +29,7 @@ jobs:
       - name: Recreate Android platform
         run: |
           cd mobile-flutter
-          flutter create . --platforms=android
+          flutter create --project-name=sgi_brvm_mobile . --platforms=android
 
       - name: Install dependencies
         run: |
