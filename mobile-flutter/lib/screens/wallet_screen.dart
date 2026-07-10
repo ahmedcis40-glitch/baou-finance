@@ -113,26 +113,27 @@ class _WalletScreenState extends State<WalletScreen> {
           children: [
             // Cash card
             Card(
+              elevation: 4,
               child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: const BorderRadius.all(Radius.circular(16)),
+                decoration: const BoxDecoration(
+                  borderRadius: BorderRadius.all(Radius.circular(16)),
                   gradient: LinearGradient(
-                    colors: [Colors.indigo.shade900.withOpacity(0.6), Colors.purple.shade900.withOpacity(0.4)],
+                    colors: [Color(0xFFFF8200), Color(0xFFE07300)],
                   ),
                 ),
                 padding: const EdgeInsets.all(20.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Portefeuille Cash SGI', style: TextStyle(color: Colors.indigoAccent, fontSize: 13)),
+                    const Text('Portefeuille Cash SGI', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w600)),
                     const SizedBox(height: 12),
                     Text(
                       '${_cashWallet?.balanceTotal.toStringAsFixed(0) ?? "0"} XOF',
-                      style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                      style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white),
                     ),
-                    const Text('Solde Cash Total', style: TextStyle(color: Colors.grey, fontSize: 11)),
+                    const Text('Solde Cash Total', style: TextStyle(color: Colors.white70, fontSize: 11)),
                     const SizedBox(height: 16),
-                    const Divider(color: Colors.white24),
+                    const Divider(color: Colors.white30),
                     const SizedBox(height: 12),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -141,13 +142,13 @@ class _WalletScreenState extends State<WalletScreen> {
                           Icons.lock_outline, 
                           'Gelé (en bourse)', 
                           '${_cashWallet?.balanceFrozen.toStringAsFixed(0) ?? "0"} F',
-                          Colors.amberAccent
+                          const Color(0xFFFFE0B2)
                         ),
                         _buildBalanceDetails(
                           Icons.lock_open, 
                           'Disponible', 
                           '${_cashWallet?.balanceAvailable.toStringAsFixed(0) ?? "0"} F',
-                          Colors.greenAccent
+                          const Color(0xFFC8E6C9)
                         ),
                       ],
                     )
@@ -200,7 +201,7 @@ class _WalletScreenState extends State<WalletScreen> {
             // Securities card
             const Text(
               'Mes Actions BRVM',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF0F172A)),
             ),
             const SizedBox(height: 12),
             if (_loading)
@@ -228,7 +229,7 @@ class _WalletScreenState extends State<WalletScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          Text('${sec.quantity}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.indigoAccent)),
+                          Text('${sec.quantity}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFFFF8200))),
                           const Text('Actions', style: TextStyle(fontSize: 10, color: Colors.grey)),
                         ],
                       ),
@@ -250,7 +251,7 @@ class _WalletScreenState extends State<WalletScreen> {
           children: [
             Icon(icon, size: 14, color: color),
             const SizedBox(width: 4),
-            Text(label, style: const TextStyle(color: Colors.grey, fontSize: 11)),
+            Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11)),
           ],
         ),
         const SizedBox(height: 4),

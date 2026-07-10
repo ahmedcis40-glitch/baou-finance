@@ -67,14 +67,14 @@ class _KycScreenState extends State<KycScreen> {
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  color: Color(0xFF0F172A),
                 ),
               ),
               const SizedBox(height: 16),
               const Text(
                 'Conformément à la réglementation de la BRVM, nos agents vérifient vos justificatifs (Identité, RIB et Facture de domicile) sous 24 heures.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey, height: 1.4),
+                style: TextStyle(color: Color(0xFF475569), height: 1.4),
               ),
               const SizedBox(height: 32),
               
@@ -86,7 +86,7 @@ class _KycScreenState extends State<KycScreen> {
                     children: [
                       const Text(
                         'Statut des documents :',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
                       ),
                       const SizedBox(height: 12),
                       _buildDocItem('Carte Nationale d\'Identité (CNI)', true),
@@ -107,17 +107,18 @@ class _KycScreenState extends State<KycScreen> {
                   context.read<AppState>().setUser(null);
                 },
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1E2030),
-                  foregroundColor: Colors.redAccent,
+                  backgroundColor: const Color(0xFFF1F5F9),
+                  foregroundColor: Colors.red,
                   padding: const EdgeInsets.symmetric(vertical: 14),
+                  elevation: 0,
                 ),
-                child: const Text('Déconnexion'),
+                child: const Text('Déconnexion', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
               const SizedBox(height: 16),
               const Text(
                 'Attente de synchronisation en temps réel...',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.indigoAccent, fontSize: 11, fontStyle: FontStyle.italic),
+                style: TextStyle(color: Color(0xFFFF8200), fontSize: 11, fontStyle: FontStyle.italic, fontWeight: FontWeight.w600),
               )
             ],
           ),
@@ -131,7 +132,7 @@ class _KycScreenState extends State<KycScreen> {
       children: [
         Icon(
           uploaded ? Icons.check_circle_outline : Icons.radio_button_unchecked,
-          color: uploaded ? Colors.greenAccent : Colors.grey,
+          color: uploaded ? const Color(0xFF009E49) : Colors.grey,
           size: 16,
         ),
         const SizedBox(width: 8),
@@ -139,7 +140,7 @@ class _KycScreenState extends State<KycScreen> {
           label,
           style: TextStyle(
             fontSize: 12,
-            color: uploaded ? Colors.white70 : Colors.grey,
+            color: uploaded ? const Color(0xFF0F172A) : const Color(0xFF94A3B8),
           ),
         ),
       ],

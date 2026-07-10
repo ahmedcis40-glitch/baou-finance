@@ -90,7 +90,7 @@ class _TradingScreenState extends State<TradingScreen> {
             children: [
               Expanded(
                 child: ChoiceChip(
-                  label: const Center(child: Text('ACHAT', style: TextStyle(fontWeight: FontWeight.bold))),
+                  label: Center(child: Text('ACHAT', style: TextStyle(fontWeight: FontWeight.bold, color: _orderType == 'ACHAT' ? Colors.white : const Color(0xFF0F172A)))),
                   selected: _orderType == 'ACHAT',
                   onSelected: (val) {
                     if (val) {
@@ -98,13 +98,14 @@ class _TradingScreenState extends State<TradingScreen> {
                       _recalculate();
                     }
                   },
-                  selectedColor: Colors.green.shade900,
+                  selectedColor: const Color(0xFF009E49),
+                  backgroundColor: Colors.white,
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: ChoiceChip(
-                  label: const Center(child: Text('VENTE', style: TextStyle(fontWeight: FontWeight.bold))),
+                  label: Center(child: Text('VENTE', style: TextStyle(fontWeight: FontWeight.bold, color: _orderType == 'VENTE' ? Colors.white : const Color(0xFF0F172A)))),
                   selected: _orderType == 'VENTE',
                   onSelected: (val) {
                     if (val) {
@@ -112,7 +113,8 @@ class _TradingScreenState extends State<TradingScreen> {
                       _recalculate();
                     }
                   },
-                  selectedColor: Colors.orange.shade900,
+                  selectedColor: const Color(0xFFFF8200),
+                  backgroundColor: Colors.white,
                 ),
               ),
             ],
@@ -122,6 +124,8 @@ class _TradingScreenState extends State<TradingScreen> {
           // Security picker
           DropdownButtonFormField<String>(
             value: _codeValeur,
+            dropdownColor: Colors.white,
+            style: const TextStyle(color: Color(0xFF0F172A)),
             decoration: const InputDecoration(labelText: 'Titre BRVM', border: OutlineInputBorder()),
             items: _stocks.map((s) {
               return DropdownMenuItem<String>(
@@ -149,6 +153,7 @@ class _TradingScreenState extends State<TradingScreen> {
               Expanded(
                 child: TextField(
                   controller: _qtyController,
+                  style: const TextStyle(color: Color(0xFF0F172A)),
                   decoration: const InputDecoration(labelText: 'Quantité', border: OutlineInputBorder()),
                   keyboardType: TextInputType.number,
                 ),
@@ -157,6 +162,7 @@ class _TradingScreenState extends State<TradingScreen> {
               Expanded(
                 child: TextField(
                   controller: _priceController,
+                  style: const TextStyle(color: Color(0xFF0F172A)),
                   decoration: const InputDecoration(labelText: 'Cours Limite (XOF)', border: OutlineInputBorder()),
                   keyboardType: TextInputType.number,
                 ),
@@ -174,12 +180,12 @@ class _TradingScreenState extends State<TradingScreen> {
                   _buildCalcRow('Coût des titres', '${(_totalEstimated - (_orderType == 'ACHAT' ? _commissions : 0)).toStringAsFixed(0)} F'),
                   const SizedBox(height: 8),
                   _buildCalcRow('Commission SGI (1.5%)', '${_commissions.toStringAsFixed(0)} F'),
-                  const Divider(color: Colors.white24, height: 24),
+                  const Divider(color: Color(0xFFE2E8F0), height: 24),
                   _buildCalcRow(
                     _orderType == 'ACHAT' ? 'Montant Total Gelé' : 'Crédit Estimé (hors frais)', 
                     '${_totalEstimated.toStringAsFixed(0)} F', 
                     isBold: true,
-                    color: _orderType == 'ACHAT' ? Colors.amberAccent : Colors.greenAccent
+                    color: _orderType == 'ACHAT' ? const Color(0xFF009E49) : const Color(0xFFFF8200)
                   ),
                 ],
               ),
@@ -190,13 +196,18 @@ class _TradingScreenState extends State<TradingScreen> {
           ElevatedButton(
             onPressed: _placeOrder,
             style: ElevatedButton.styleFrom(
-              backgroundColor: _orderType == 'ACHAT' ? Colors.indigo : Colors.orange.shade800,
-              padding: const EdgeInsets.symmetric(vertical: 14),
+              backgroundColor: _orderType == 'ACHAT' ? const Color(0xFF009E49) : const Color(0xFFFF8200),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
             child: Text(
               _orderType == 'ACHAT' 
                   ? 'Soumettre Achat (Geler les fonds)' 
-                  : 'Soumettre Vente (Escrow titres)'
+                  : 'Soumettre Vente (Escrow titres)',
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
             ),
           )
         ],
@@ -208,13 +219,13 @@ class _TradingScreenState extends State<TradingScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
+        Text(label, style: TextStyle(color: const Color(0xFF475569), fontSize: 12, fontWeight: isBold ? FontWeight.bold : FontWeight.normal)),
         Text(
           val, 
           style: TextStyle(
             fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
             fontFamily: 'monospace',
-            color: color ?? (isBold ? Colors.white : Colors.white70),
+            color: color ?? (isBold ? const Color(0xFF0F172A) : const Color(0xFF475569)),
           )
         ),
       ],

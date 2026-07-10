@@ -18,9 +18,34 @@ class _LoginScreenState extends State<LoginScreen> {
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _whatsappPhoneController = TextEditingController();
   
   bool _isRegistering = false;
   bool _consentSMS = true;
+  bool _consentWhatsApp = true;
+  
+  // Onboarding dropdown selections (matching website values)
+  String _selectedSgi = 'Société Générale Capital Securities West Africa';
+  String _selectedObjective = 'EPARGNE';
+  String _selectedProfile = 'MODERE';
+  String _selectedHorizon = 'MOYEN_TERME';
+  
+  // Mock KYC files selections (matching website values)
+  String _selectedIdFile = 'cni_recto_verso.pdf';
+  String _selectedPhotoFile = 'photo_koffi.jpg';
+  String _selectedAddressFile = 'facture_cie_avril2026.pdf';
+
+  final List<String> _sgis = [
+    'Société Générale Capital Securities West Africa',
+    'BICI Bourse',
+    'BOA Capital Securities',
+    'Coris Bourse',
+    'Ecobank Investment Corporation',
+    'NSIA Finance',
+    'ATLANTIQUE FINANCE',
+    'ATTIJARI SECURITIES WEST AFRICA',
+  ];
+
   String _errorMessage = '';
 
   Future<void> _submit() async {
@@ -34,28 +59,50 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       if (_isRegistering) {
+        // Validation check
+        if (_firstNameController.text.isEmpty ||
+            _lastNameController.text.isEmpty ||
+            _emailController.text.isEmpty ||
+            _passwordController.text.isEmpty ||
+            _phoneController.text.isEmpty ||
+            _whatsappPhoneController.text.isEmpty) {
+          throw Exception('Veuillez remplir tous les champs obligatoires.');
+        }
+
         await api.register({
           'email': _emailController.text.trim(),
           'password': _passwordController.text,
           'firstName': _firstNameController.text.trim(),
           'lastName': _lastNameController.text.trim(),
           'phone': _phoneController.text.trim(),
+          'whatsappPhone': _whatsappPhoneController.text.trim(),
           'consentSMS': _consentSMS,
+          'consentWhatsApp': _consentWhatsApp,
+          'sgiPartenaire': _selectedSgi,
+          'investorProfile': _selectedProfile,
+          'investorHorizon': _selectedHorizon,
+          'investorObjective': _selectedObjective,
           'kycDocuments': {
-            'identityCardUrl': 'http://localhost:3000/docs/cni.pdf',
-            'ribUrl': 'http://localhost:3000/docs/rib.pdf',
-            'proofOfAddressUrl': 'http://localhost:3000/docs/domicile.pdf',
+            'identityCardUrl': '/docs/$_selectedIdFile',
+            'photoUrl': '/docs/$_selectedPhotoFile',
+            'proofOfAddressUrl': '/docs/$_selectedAddressFile',
           }
         });
         
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Inscription réussie ! Veuillez valider votre KYC.')),
+          const SnackBar(
+            backgroundColor: Color(0xFF009E49),
+            content: Text('Inscription réussie ! Dossier de compte-titres créé.'),
+          ),
         );
         
         setState(() {
           _isRegistering = false;
         });
       } else {
+        if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+          throw Exception('Veuillez saisir votre email et mot de passe.');
+        }
         final user = await api.login(
           _emailController.text.trim(),
           _passwordController.text,
@@ -71,6 +118,30 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 20.0, bottom: 8.0),
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 16,
+            color: const Color(0xFFFF8200),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
@@ -82,89 +153,244 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 40),
-              const Icon(Icons.account_balance, size: 64, color: Colors.indigoAccent),
+              const SizedBox(height: 10),
+              // Flag bar accent
+              Row(
+                children: [
+                  Expanded(child: Container(height: 4, color: const Color(0xFFFF8200))),
+                  Expanded(child: Container(height: 4, color: Colors.white)),
+                  Expanded(child: Container(height: 4, color: const Color(0xFF009E49))),
+                ],
+              ),
+              const SizedBox(height: 30),
+              const Icon(Icons.account_balance, size: 64, color: Color(0xFFFF8200)),
               const SizedBox(height: 16),
               Text(
-                _isRegistering ? 'Créer un Compte SGI' : 'Portail Bourse SGI',
+                _isRegistering ? 'Ouverture de Compte Titres' : 'Portail Bourse SGI',
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                style: const TextStyle(
+                  fontSize: 24, 
+                  fontWeight: FontWeight.bold, 
+                  color: Color(0xFF0F172A),
+                ),
               ),
               const SizedBox(height: 8),
               const Text(
                 'Négociation de titres BRVM & Paiements Wave / Orange / MTN',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey, fontSize: 13),
+                style: TextStyle(color: Color(0xFF475569), fontSize: 13),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 24),
 
               if (_isRegistering) ...[
+                _buildSectionHeader('Informations Personnelles'),
                 Row(
                   children: [
                     Expanded(
                       child: TextField(
                         controller: _firstNameController,
-                        decoration: const InputDecoration(labelText: 'Prénom', filled: true),
+                        style: const TextStyle(color: Color(0xFF0F172A)),
+                        decoration: const InputDecoration(labelText: 'Prénom *'),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: TextField(
                         controller: _lastNameController,
-                        decoration: const InputDecoration(labelText: 'Nom', filled: true),
+                        style: const TextStyle(color: Color(0xFF0F172A)),
+                        decoration: const InputDecoration(labelText: 'Nom *'),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
+
+                _buildSectionHeader('SGI Partenaire & Routage'),
+                DropdownButtonFormField<String>(
+                  value: _selectedSgi,
+                  dropdownColor: Colors.white,
+                  style: const TextStyle(color: Color(0xFF0F172A), fontSize: 13),
+                  decoration: const InputDecoration(labelText: 'SGI Partenaire *'),
+                  items: _sgis.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
+                  onChanged: (val) => setState(() => _selectedSgi = val!),
+                ),
+                const SizedBox(height: 12),
+
+                _buildSectionHeader('Coordonnées & Notifications'),
                 TextField(
                   controller: _phoneController,
-                  decoration: const InputDecoration(labelText: 'N° Téléphone (Mobile Money)', filled: true),
+                  style: const TextStyle(color: Color(0xFF0F172A)),
+                  decoration: const InputDecoration(
+                    labelText: 'Téléphone Réglementaire *',
+                    hintText: '+225...',
+                  ),
                   keyboardType: TextInputType.phone,
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _whatsappPhoneController,
+                  style: const TextStyle(color: Color(0xFF0F172A)),
+                  decoration: const InputDecoration(
+                    labelText: 'Numéro WhatsApp (Exigé) *',
+                    hintText: '+225...',
+                  ),
+                  keyboardType: TextInputType.phone,
+                ),
+                const SizedBox(height: 10),
+
+                // Consent toggles styled elegantly
+                CheckboxListTile(
+                  title: const Text('Notifications par SMS', style: TextStyle(fontSize: 12, color: Color(0xFF475569))),
+                  value: _consentSMS,
+                  activeColor: const Color(0xFFFF8200),
+                  onChanged: (val) => setState(() => _consentSMS = val ?? true),
+                  contentPadding: EdgeInsets.zero,
+                ),
+                CheckboxListTile(
+                  title: const Text('Notifications par WhatsApp', style: TextStyle(fontSize: 12, color: Color(0xFF475569))),
+                  value: _consentWhatsApp,
+                  activeColor: const Color(0xFFFF8200),
+                  onChanged: (val) => setState(() => _consentWhatsApp = val ?? true),
+                  contentPadding: EdgeInsets.zero,
+                ),
+
+                _buildSectionHeader('Profil Investisseur AMF-UMOA'),
+                DropdownButtonFormField<String>(
+                  value: _selectedObjective,
+                  dropdownColor: Colors.white,
+                  style: const TextStyle(color: Color(0xFF0F172A)),
+                  decoration: const InputDecoration(labelText: 'Objectif d\'Investissement *'),
+                  items: const [
+                    DropdownMenuItem(value: 'EPARGNE', child: Text('Épargne & Valorisation')),
+                    DropdownMenuItem(value: 'REVENUS', child: Text('Recherche de dividendes')),
+                    DropdownMenuItem(value: 'SPECULATION', child: Text('Opérations spéculatives (Court terme)')),
+                  ],
+                  onChanged: (val) => setState(() => _selectedObjective = val!),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: _selectedProfile,
+                  dropdownColor: Colors.white,
+                  style: const TextStyle(color: Color(0xFF0F172A)),
+                  decoration: const InputDecoration(labelText: 'Aversion au Risque *'),
+                  items: const [
+                    DropdownMenuItem(value: 'PRUDENT', child: Text('Prudent (ex: CIE, SODECI)')),
+                    DropdownMenuItem(value: 'MODERE', child: Text('Modéré (ex: SONATEL, SGBCI)')),
+                    DropdownMenuItem(value: 'DYNAMIQUE', child: Text('Audacieux (Actions de croissance)')),
+                  ],
+                  onChanged: (val) => setState(() => _selectedProfile = val!),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: _selectedHorizon,
+                  dropdownColor: Colors.white,
+                  style: const TextStyle(color: Color(0xFF0F172A)),
+                  decoration: const InputDecoration(labelText: 'Horizon de Placement *'),
+                  items: const [
+                    DropdownMenuItem(value: 'COURT_TERME', child: Text('Court terme (< 2 ans)')),
+                    DropdownMenuItem(value: 'MOYEN_TERME', child: Text('Moyen terme (2 à 5 ans)')),
+                    DropdownMenuItem(value: 'LONG_TERME', child: Text('Long terme (> 5 ans)')),
+                  ],
+                  onChanged: (val) => setState(() => _selectedHorizon = val!),
+                ),
+
+                _buildSectionHeader('Pièces Justificatives KYC'),
+                DropdownButtonFormField<String>(
+                  value: _selectedIdFile,
+                  dropdownColor: Colors.white,
+                  style: const TextStyle(color: Color(0xFF0F172A)),
+                  decoration: const InputDecoration(labelText: 'Pièce d\'identité (Recto/Verso) *'),
+                  items: const [
+                    DropdownMenuItem(value: 'cni_recto_verso.pdf', child: Text('cni_recto_verso.pdf')),
+                    DropdownMenuItem(value: 'passeport_biometrique.pdf', child: Text('passeport_biometrique.pdf')),
+                  ],
+                  onChanged: (val) => setState(() => _selectedIdFile = val!),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: _selectedPhotoFile,
+                  dropdownColor: Colors.white,
+                  style: const TextStyle(color: Color(0xFF0F172A)),
+                  decoration: const InputDecoration(labelText: 'Photo d\'identité récente *'),
+                  items: const [
+                    DropdownMenuItem(value: 'photo_koffi.jpg', child: Text('photo_koffi.jpg')),
+                    DropdownMenuItem(value: 'photo_profil.png', child: Text('photo_profil.png')),
+                  ],
+                  onChanged: (val) => setState(() => _selectedPhotoFile = val!),
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: _selectedAddressFile,
+                  dropdownColor: Colors.white,
+                  style: const TextStyle(color: Color(0xFF0F172A)),
+                  decoration: const InputDecoration(labelText: 'Justificatif de domicile *'),
+                  items: const [
+                    DropdownMenuItem(value: 'facture_cie_avril2026.pdf', child: Text('facture_cie_avril2026.pdf')),
+                    DropdownMenuItem(value: 'facture_sodeci_mars2026.pdf', child: Text('facture_sodeci_mars2026.pdf')),
+                  ],
+                  onChanged: (val) => setState(() => _selectedAddressFile = val!),
                 ),
                 const SizedBox(height: 12),
               ],
 
+              _buildSectionHeader('Authentification'),
               TextField(
                 controller: _emailController,
-                decoration: const InputDecoration(labelText: 'Adresse Email', filled: true),
+                style: const TextStyle(color: Color(0xFF0F172A)),
+                decoration: const InputDecoration(
+                  labelText: 'Adresse Email *',
+                  hintText: 'exemple@sgi.ci',
+                ),
                 keyboardType: TextInputType.emailAddress,
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: _passwordController,
-                decoration: const InputDecoration(labelText: 'Mot de passe', filled: true),
+                style: const TextStyle(color: Color(0xFF0F172A)),
+                decoration: const InputDecoration(
+                  labelText: 'Mot de passe *',
+                  hintText: '••••••••',
+                ),
                 obscureText: true,
               ),
-              const SizedBox(height: 16),
-
-              if (_isRegistering) ...[
-                CheckboxListTile(
-                  title: const Text('J\'accepte de recevoir des notifications d\'exécution d\'ordres par SMS', style: TextStyle(fontSize: 11)),
-                  value: _consentSMS,
-                  onChanged: (val) => setState(() => _consentSMS = val ?? true),
-                  contentPadding: EdgeInsets.zero,
-                ),
-                const SizedBox(height: 8),
-              ],
+              const SizedBox(height: 20),
 
               if (_errorMessage.isNotEmpty) ...[
-                Text(_errorMessage, style: const TextStyle(color: Colors.redAccent, fontSize: 13)),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEE2E2),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFFCA5A5)),
+                  ),
+                  child: Text(
+                    _errorMessage, 
+                    style: const TextStyle(color: Color(0xFF991B1B), fontSize: 13, fontWeight: FontWeight.w500),
+                  ),
+                ),
                 const SizedBox(height: 16),
               ],
 
               if (state.isLoading)
-                const Center(child: CircularProgressIndicator())
+                const Center(child: CircularProgressIndicator(color: Color(0xFFFF8200)))
               else
                 ElevatedButton(
                   onPressed: _submit,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.indigo,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    backgroundColor: const Color(0xFFFF8200),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    elevation: 1,
                   ),
-                  child: Text(_isRegistering ? 'Soumettre Dossier KYC' : 'Connexion'),
+                  child: Text(
+                    _isRegistering ? 'Soumettre le Dossier d\'Ouverture' : 'Se Connecter',
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                  ),
                 ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
               
               TextButton(
                 onPressed: () {
@@ -175,9 +401,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 },
                 child: Text(
                   _isRegistering 
-                      ? 'Déjà inscrit ? Connectez-vous' 
-                      : 'Nouveau client ? Ouvrir un compte SGI',
-                  style: const TextStyle(color: Colors.indigoAccent),
+                      ? 'Vous avez déjà un compte ? Se connecter' 
+                      : 'Créer un Compte-Titres Réglementaire (KYC)',
+                  style: const TextStyle(color: Color(0xFF009E49), fontWeight: FontWeight.w600),
                 ),
               ),
             ],

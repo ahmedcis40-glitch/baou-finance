@@ -63,13 +63,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                       decoration: BoxDecoration(
-                                        color: ord.type == OrderType.ACHAT ? Colors.green.withOpacity(0.15) : Colors.orange.withOpacity(0.15),
+                                        color: ord.type == OrderType.ACHAT ? const Color(0xFFE8F5E9) : const Color(0xFFFFF3E0),
                                         borderRadius: const BorderRadius.all(Radius.circular(4)),
                                       ),
                                       child: Text(
                                         ord.type.toString().split('.').last,
                                         style: TextStyle(
-                                          color: ord.type == OrderType.ACHAT ? Colors.greenAccent : Colors.orangeAccent,
+                                          color: ord.type == OrderType.ACHAT ? const Color(0xFF009E49) : const Color(0xFFFF8200),
                                           fontSize: 9,
                                           fontWeight: FontWeight.bold,
                                         ),
@@ -78,18 +78,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                     const SizedBox(width: 8),
                                     Text(
                                       ord.codeValeur,
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontFamily: 'monospace'),
+                                      style: const TextStyle(fontWeight: FontWeight.bold, fontFamily: 'monospace', color: Color(0xFF0F172A)),
                                     )
                                   ],
                                 ),
                                 const SizedBox(height: 6),
                                 Text(
                                   '${ord.quantityRequested} actions à ${ord.priceRequested.toStringAsFixed(0)} F',
-                                  style: const TextStyle(color: Colors.white70, fontSize: 12),
+                                  style: const TextStyle(color: Color(0xFF475569), fontSize: 12),
                                 ),
                                 Text(
                                   'Le ${ord.createdAt.day}/${ord.createdAt.month} à ${ord.createdAt.hour}:${ord.createdAt.minute}',
-                                  style: const TextStyle(color: Colors.grey, fontSize: 10),
+                                  style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 10),
                                 ),
                               ],
                             ),
@@ -108,20 +108,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
     Color fg;
     switch (status) {
       case OrderStatus.EXECUTE:
-        bg = Colors.green.withOpacity(0.15);
-        fg = Colors.greenAccent;
+        bg = const Color(0xFFE8F5E9);
+        fg = const Color(0xFF009E49);
         break;
       case OrderStatus.ANNULE:
-        bg = Colors.red.withOpacity(0.15);
-        fg = Colors.redAccent;
+        bg = const Color(0xFFFFEBEE);
+        fg = const Color(0xFFD32F2F);
         break;
       case OrderStatus.EN_TRAITEMENT:
-        bg = Colors.blue.withOpacity(0.15);
-        fg = Colors.blueAccent;
+        bg = const Color(0xFFE3F2FD);
+        fg = const Color(0xFF1976D2);
         break;
       case OrderStatus.EN_ATTENTE:
-        bg = Colors.yellow.withOpacity(0.15);
-        fg = Colors.yellowAccent;
+        bg = const Color(0xFFFFFDE7);
+        fg = const Color(0xFFFBC02D);
         break;
     }
 

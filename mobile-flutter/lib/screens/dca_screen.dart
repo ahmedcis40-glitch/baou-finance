@@ -105,6 +105,8 @@ class _DcaScreenState extends State<DcaScreen> {
               children: [
                 DropdownButtonFormField<String>(
                   value: _selectedSymbol,
+                  dropdownColor: Colors.white,
+                  style: const TextStyle(color: Color(0xFF0F172A)),
                   decoration: const InputDecoration(labelText: 'Action cible'),
                   items: _symbols.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
                   onChanged: (val) => setDialogState(() => _selectedSymbol = val!),
@@ -112,12 +114,15 @@ class _DcaScreenState extends State<DcaScreen> {
                 const SizedBox(height: 8),
                 TextField(
                   controller: _amountController,
+                  style: const TextStyle(color: Color(0xFF0F172A)),
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(labelText: 'Montant à investir périodiquement (XOF)'),
                 ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   value: _selectedFrequency,
+                  dropdownColor: Colors.white,
+                  style: const TextStyle(color: Color(0xFF0F172A)),
                   decoration: const InputDecoration(labelText: 'Fréquence'),
                   items: _frequencies.map((f) => DropdownMenuItem(value: f, child: Text(f))).toList(),
                   onChanged: (val) => setDialogState(() => _selectedFrequency = val!),
@@ -174,10 +179,11 @@ class _DcaScreenState extends State<DcaScreen> {
                         child: ListTile(
                           title: Text(
                             '${plan['symbol']} - DCA ${plan['frequency']}',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                           ),
                           subtitle: Text(
                             'Investissement : ${plan['amount']} XOF\nProchaine exécution : ${plan['nextRun'].toString().substring(0, 10)}',
+                            style: const TextStyle(color: Color(0xFF475569)),
                           ),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,

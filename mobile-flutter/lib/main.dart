@@ -48,41 +48,55 @@ class SgiApp extends StatelessWidget {
       title: 'SGI BRVM Bourse',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        brightness: Brightness.dark,
-        primaryColor: Colors.indigo,
-        scaffoldBackgroundColor: const Color(0xFF090A10),
-        colorScheme: ColorScheme.dark(
-          primary: Colors.indigo,
-          secondary: Colors.indigoAccent,
-          surface: const Color(0xFF11121B),
-          background: const Color(0xFF090A10),
+        brightness: Brightness.light,
+        primaryColor: const Color(0xFFFF8200),
+        scaffoldBackgroundColor: const Color(0xFFF8FAFC),
+        colorScheme: const ColorScheme.light(
+          primary: Color(0xFFFF8200),
+          secondary: Color(0xFF009E49),
+          surface: Colors.white,
+          background: Color(0xFFF8FAFC),
         ),
         inputDecorationTheme: const InputDecorationTheme(
           border: OutlineInputBorder(
             borderRadius: BorderRadius.all(Radius.circular(8)),
-            borderSide: BorderSide(color: Colors.white12),
+            borderSide: BorderSide(color: Color(0xFFE2E8F0)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.all(Radius.circular(8)),
+            borderSide: BorderSide(color: Color(0xFFE2E8F0)),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.all(Radius.circular(8)),
-            borderSide: BorderSide(color: Colors.indigoAccent),
+            borderSide: BorderSide(color: Color(0xFFFF8200)),
           ),
           filled: true,
-          fillColor: Color(0xFF11121B),
-          labelStyle: TextStyle(fontSize: 12),
+          fillColor: Colors.white,
+          labelStyle: TextStyle(fontSize: 12, color: Color(0xFF475569)),
+          floatingLabelStyle: TextStyle(color: Color(0xFFFF8200)),
         ),
         cardTheme: const CardTheme(
-          color: Color(0xFF11121B),
-          elevation: 0,
+          color: Colors.white,
+          elevation: 2,
+          shadowColor: Color(0x0A000000),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.all(Radius.circular(16)),
+            side: BorderSide(color: Color(0xFFE2E8F0), width: 1),
           ),
         ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.white,
+          foregroundColor: Color(0xFF0F172A),
+          elevation: 1,
+          shadowColor: Color(0xFFE2E8F0),
+        ),
         bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-          backgroundColor: Color(0xFF0C0D14),
-          selectedItemColor: Colors.indigoAccent,
-          unselectedItemColor: Colors.grey,
+          backgroundColor: Colors.white,
+          selectedItemColor: Color(0xFFFF8200),
+          unselectedItemColor: Color(0xFF94A3B8),
           selectedLabelStyle: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
           unselectedLabelStyle: TextStyle(fontSize: 11),
+          elevation: 8,
         ),
       ),
       home: const AuthWrapper(),
@@ -155,8 +169,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('SGI Mobile Client', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        backgroundColor: const Color(0xFF0C0D14),
-        elevation: 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.logout, size: 18),
