@@ -29,7 +29,7 @@ export default function App() {
   // SGI Admin Auth State
   const [adminToken, setAdminToken] = useState(localStorage.getItem('adminToken') || null);
   const [adminUser, setAdminUser] = useState(null);
-  const [adminEmail, setAdminEmail] = useState('trader@sgi.ci');
+  const [adminEmail, setAdminEmail] = useState('admin@sgi.ci');
   const [adminPassword, setAdminPassword] = useState('password123');
   const [adminTab, setAdminTab] = useState('trading'); // 'kyc' | 'trading' | 'jeko' | 'audit'
   
@@ -386,14 +386,15 @@ export default function App() {
               <form onSubmit={handleAdminLogin} className="space-y-4">
                 <div>
                   <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Email professionnel</label>
-                  <select 
+                  <input 
+                    type="email"
                     value={adminEmail} 
                     onChange={(e) => setAdminEmail(e.target.value)}
                     className="w-full bg-[#11121b] border border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-indigo-500"
-                  >
-                    <option value="kyc_agent@sgi.ci">kyc_agent@sgi.ci (Agent KYC)</option>
-                    <option value="trader@sgi.ci">trader@sgi.ci (Trader Marché)</option>
-                  </select>
+                    placeholder="admin@sgi.ci"
+                    required
+                  />
+                  <span className="text-[10px] text-gray-500 mt-1 block">Compte démo par défaut : admin@sgi.ci (password123)</span>
                 </div>
 
                 <div>
