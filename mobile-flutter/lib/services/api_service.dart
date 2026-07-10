@@ -46,8 +46,12 @@ class ApiService {
 
     if (response.statusCode == 201 || response.statusCode == 200) {
       final data = jsonDecode(response.body);
-      await _saveToken(data['accessToken']);
-      return User.fromJson(data['user']);
+      final accessToken = data['accessToken'] as String?;
+      if (accessToken == null) throw Exception('Token manquant dans la réponse.');
+      await _saveToken(accessToken);
+      final userJson = data['user'] as Map<String, dynamic>?;
+      if (userJson == null) throw Exception('Données utilisateur manquantes.');
+      return User.fromJson(userJson);
     } else {
       final error = jsonDecode(response.body);
       throw Exception(error['message'] ?? 'Erreur d\'authentification');

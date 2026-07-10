@@ -89,6 +89,7 @@ class _LoginScreenState extends State<LoginScreen> {
           }
         });
         
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             backgroundColor: Color(0xFF009E49),
@@ -240,7 +241,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   style: const TextStyle(color: Color(0xFF0F172A), fontSize: 13),
                   decoration: const InputDecoration(labelText: 'SGI Partenaire *'),
                   items: _sgis.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-                  onChanged: (val) => setState(() => _selectedSgi = val!),
+                  onChanged: (val) { if (val != null) setState(() => _selectedSgi = val); },
                 ),
                 const SizedBox(height: 12),
 
@@ -293,7 +294,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     DropdownMenuItem(value: 'REVENUS', child: Text('Recherche de dividendes')),
                     DropdownMenuItem(value: 'SPECULATION', child: Text('Opérations spéculatives (Court terme)')),
                   ],
-                  onChanged: (val) => setState(() => _selectedObjective = val!),
+                  onChanged: (val) { if (val != null) setState(() => _selectedObjective = val); },
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
@@ -306,7 +307,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     DropdownMenuItem(value: 'MODERE', child: Text('Modéré (ex: SONATEL, SGBCI)')),
                     DropdownMenuItem(value: 'DYNAMIQUE', child: Text('Audacieux (Actions de croissance)')),
                   ],
-                  onChanged: (val) => setState(() => _selectedProfile = val!),
+                  onChanged: (val) { if (val != null) setState(() => _selectedProfile = val); },
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
@@ -319,7 +320,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     DropdownMenuItem(value: 'MOYEN_TERME', child: Text('Moyen terme (2 à 5 ans)')),
                     DropdownMenuItem(value: 'LONG_TERME', child: Text('Long terme (> 5 ans)')),
                   ],
-                  onChanged: (val) => setState(() => _selectedHorizon = val!),
+                  onChanged: (val) { if (val != null) setState(() => _selectedHorizon = val); },
                 ),
 
                 _buildSectionHeader('Pièces Justificatives KYC'),
@@ -332,7 +333,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     DropdownMenuItem(value: 'cni_recto_verso.pdf', child: Text('cni_recto_verso.pdf')),
                     DropdownMenuItem(value: 'passeport_biometrique.pdf', child: Text('passeport_biometrique.pdf')),
                   ],
-                  onChanged: (val) => setState(() => _selectedIdFile = val!),
+                  onChanged: (val) { if (val != null) setState(() => _selectedIdFile = val); },
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
@@ -344,7 +345,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     DropdownMenuItem(value: 'photo_koffi.jpg', child: Text('photo_koffi.jpg')),
                     DropdownMenuItem(value: 'photo_profil.png', child: Text('photo_profil.png')),
                   ],
-                  onChanged: (val) => setState(() => _selectedPhotoFile = val!),
+                  onChanged: (val) { if (val != null) setState(() => _selectedPhotoFile = val); },
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
@@ -356,7 +357,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     DropdownMenuItem(value: 'facture_cie_avril2026.pdf', child: Text('facture_cie_avril2026.pdf')),
                     DropdownMenuItem(value: 'facture_sodeci_mars2026.pdf', child: Text('facture_sodeci_mars2026.pdf')),
                   ],
-                  onChanged: (val) => setState(() => _selectedAddressFile = val!),
+                  onChanged: (val) { if (val != null) setState(() => _selectedAddressFile = val); },
                 ),
                 const SizedBox(height: 12),
               ],

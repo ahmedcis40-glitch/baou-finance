@@ -14,6 +14,7 @@ class _WalletScreenState extends State<WalletScreen> {
   CashWallet? _cashWallet;
   List<SecuritiesWallet> _securities = [];
   bool _loading = false;
+  bool _submitting = false;
   final _amountController = TextEditingController(text: '100000');
 
   @override
@@ -33,6 +34,7 @@ class _WalletScreenState extends State<WalletScreen> {
         _securities = sec;
       });
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erreur de chargement: $e')),
       );
@@ -44,40 +46,85 @@ class _WalletScreenState extends State<WalletScreen> {
   bool _isWithdraw = false;
 
   Future<void> _initiatePawaPayDeposit() async {
+    if (_submitting) return;
+    setState(() => _submitting = true);
     final api = context.read<ApiService>();
     final amount = double.tryParse(_amountController.text) ?? 0;
-    if (amount <= 0) return;
+    if (amount <= 0) {
+      setState(() => _submitting = false);
+      return;
+    }
 
     try {
       final result = await api.initiateDeposit(amount);
-      final idInternal = result['transactionId'];
+      // Safe null handling: transactionId peut être null si la réponse est incomplète
+      final idInternal = (result['transactionId'] as String?) ?? '';
+      final paymentUrl = result['paymentUrl'] as String?;
+      final mode = (result['mode'] as String?) ?? 'sandbox_simulation';
 
       if (!mounted) return;
+
+      // Si PawaPay renvoie une URL de checkout → on l'affiche directement
+      if (paymentUrl != null && paymentUrl.isNotEmpty && mode == 'pawapay_live') {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Dépôt PawaPay'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Montant: ${amount.toStringAsFixed(0)} XOF'),
+                const SizedBox(height: 12),
+                const Text('Votre page de paiement PawaPay est prête. Ouvrez-la sur votre téléphone.', style: TextStyle(fontSize: 12)),
+                const SizedBox(height: 8),
+                SelectableText(paymentUrl, style: const TextStyle(fontSize: 10, color: Colors.blue)),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Fermer'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+
+      // Mode sandbox : simulation locale du webhook
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('Validation PawaPay (Wave/Orange/MTN)'),
+          title: const Text('Validation PawaPay (Mode Test)'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Montant à payer: ${amount.toStringAsFixed(0)} XOF'),
+              Text('Montant à déposer: ${amount.toStringAsFixed(0)} XOF'),
               const SizedBox(height: 12),
               const Text(
-                'Saisissez votre code PIN Mobile Money pour valider le dépôt. (Simule le Webhook PawaPay)',
+                'Mode sandbox — cliquez "Confirmer" pour simuler la validation du paiement.',
                 style: TextStyle(fontSize: 12, color: Colors.grey),
               ),
             ],
           ),
           actions: [
             TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Annuler'),
+            ),
+            TextButton(
               onPressed: () async {
                 Navigator.pop(ctx);
+                if (idInternal.isEmpty) return;
                 try {
-                  await api.simulateWebhook(idInternal, 'SUCCESS', amount);
+                  await api.simulateWebhook(idInternal, 'COMPLETED', amount);
                   _loadData();
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Dépôt validé avec succès via Webhook PawaPay !')),
+                      const SnackBar(
+                        content: Text('✅ Dépôt validé avec succès !'),
+                        backgroundColor: Colors.green,
+                      ),
                     );
                   }
                 } catch (err) {
@@ -88,29 +135,41 @@ class _WalletScreenState extends State<WalletScreen> {
                   }
                 }
               },
-              child: const Text('Confirmer le PIN (Succès)', style: TextStyle(color: Colors.greenAccent)),
+              child: const Text('Confirmer (Succès)', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
       );
 
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur dépôt: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur dépôt: $e')),
+        );
+      }
+    } finally {
+      setState(() => _submitting = false);
     }
   }
 
   Future<void> _initiatePawaPayWithdrawal() async {
+    if (_submitting) return;
+    setState(() => _submitting = true);
     final api = context.read<ApiService>();
     final amount = double.tryParse(_amountController.text) ?? 0;
-    if (amount <= 0) return;
+    if (amount <= 0) {
+      setState(() => _submitting = false);
+      return;
+    }
 
     try {
       final result = await api.initiateWithdrawal(amount);
-      final idInternal = result['transactionId'];
+      // Safe null handling
+      final idInternal = (result['transactionId'] as String?) ?? '';
+      final mode = (result['mode'] as String?) ?? 'sandbox_simulation';
 
       if (!mounted) return;
+
       showDialog(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -120,42 +179,56 @@ class _WalletScreenState extends State<WalletScreen> {
             children: [
               Text('Montant à retirer: ${amount.toStringAsFixed(0)} XOF'),
               const SizedBox(height: 12),
-              const Text(
-                'Saisissez votre code PIN Mobile Money pour valider la réception des fonds. (Simule le Webhook PawaPay)',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
+              Text(
+                mode == 'pawapay_live'
+                    ? 'Retrait initié ! Vous recevrez les fonds sur votre Mobile Money sous peu.'
+                    : 'Mode test — cliquez "Confirmer" pour simuler la réception des fonds.',
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
               ),
             ],
           ),
           actions: [
             TextButton(
-              onPressed: () async {
-                Navigator.pop(ctx);
-                try {
-                  await api.simulateWebhook(idInternal, 'SUCCESS', amount);
-                  _loadData();
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Retrait validé avec succès via Webhook PawaPay !')),
-                    );
-                  }
-                } catch (err) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Erreur: $err')),
-                    );
-                  }
-                }
-              },
-              child: const Text('Confirmer le PIN (Succès)', style: TextStyle(color: Colors.greenAccent)),
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Fermer'),
             ),
+            if (mode != 'pawapay_live' && idInternal.isNotEmpty)
+              TextButton(
+                onPressed: () async {
+                  Navigator.pop(ctx);
+                  try {
+                    await api.simulateWebhook(idInternal, 'COMPLETED', amount);
+                    _loadData();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('✅ Retrait validé avec succès !'),
+                          backgroundColor: Colors.orange,
+                        ),
+                      );
+                    }
+                  } catch (err) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Erreur: $err')),
+                      );
+                    }
+                  }
+                },
+                child: const Text('Confirmer (Succès)', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
+              ),
           ],
         ),
       );
 
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur retrait: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur retrait: $e')),
+        );
+      }
+    } finally {
+      setState(() => _submitting = false);
     }
   }
 
@@ -274,8 +347,10 @@ class _WalletScreenState extends State<WalletScreen> {
                         ),
                         const SizedBox(width: 12),
                         ElevatedButton.icon(
-                          onPressed: _isWithdraw ? _initiatePawaPayWithdrawal : _initiatePawaPayDeposit,
-                          icon: Icon(_isWithdraw ? Icons.call_received_rounded : Icons.send_rounded, size: 16),
+                          onPressed: _submitting ? null : (_isWithdraw ? _initiatePawaPayWithdrawal : _initiatePawaPayDeposit),
+                          icon: _submitting
+                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                              : Icon(_isWithdraw ? Icons.call_received_rounded : Icons.send_rounded, size: 16),
                           label: Text(_isWithdraw ? 'Retirer' : 'Déposer'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: _isWithdraw ? const Color(0xFFFF8200) : const Color(0xFF009E49),

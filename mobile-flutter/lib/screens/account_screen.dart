@@ -51,7 +51,7 @@ class AccountScreen extends StatelessWidget {
                     radius: 30,
                     backgroundColor: const Color(0xFFFF8200).withOpacity(0.1),
                     child: Text(
-                      '${user.firstName[0]}${user.lastName[0]}'.toUpperCase(),
+                      '${user.firstName.isNotEmpty ? user.firstName[0] : '?'}${user.lastName.isNotEmpty ? user.lastName[0] : '?'}'.toUpperCase(),
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -105,7 +105,7 @@ class AccountScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    user.sgiPartenaire,
+                    user.sgiPartenaire ?? 'SGI partenaire non renseignée',
                     style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                   ),
                   const SizedBox(height: 6),
@@ -152,7 +152,7 @@ class AccountScreen extends StatelessWidget {
                         builder: (ctx) => AlertDialog(
                           title: const Text('Convention PDF'),
                           content: Text(
-                            'Téléchargement de la "Convention d\'Apporteur d\'Affaires & Compte Titres" signée électroniquement entre BAOU, ${user.sgiPartenaire} et ${user.firstName} ${user.lastName}.\n\nRéférence : CONV-SGI-${user.id.substring(0, 8).toUpperCase()}',
+                            'Téléchargement de la "Convention d\'Apporteur d\'Affaires & Compte Titres" signée électroniquement entre BAOU, ${user.sgiPartenaire ?? 'SGI partenaire'} et ${user.firstName} ${user.lastName}.\n\nRéférence : CONV-SGI-${user.id.length >= 8 ? user.id.substring(0, 8).toUpperCase() : user.id.toUpperCase()}',
                           ),
                           actions: [
                             TextButton(
@@ -195,11 +195,11 @@ class AccountScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  _buildProfileRow('Aversion au Risque :', getAversionLabel(user.investorProfile)),
+                  _buildProfileRow('Aversion au Risque :', getAversionLabel(user.investorProfile ?? 'MODERE')),
                   const SizedBox(height: 12),
-                  _buildProfileRow('Horizon de Placement :', getHorizonLabel(user.investorHorizon)),
+                  _buildProfileRow('Horizon de Placement :', getHorizonLabel(user.investorHorizon ?? 'MOYEN_TERME')),
                   const SizedBox(height: 12),
-                  _buildProfileRow('Objectif Financier :', getObjectiveLabel(user.investorObjective)),
+                  _buildProfileRow('Objectif Financier :', getObjectiveLabel(user.investorObjective ?? 'EPARGNE')),
                   const SizedBox(height: 16),
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -209,7 +209,7 @@ class AccountScreen extends StatelessWidget {
                       border: Border.all(color: const Color(0xFFE2E8F0)),
                     ),
                     child: Text(
-                      '💬 Consentement de notification :\nLes alertes d\'exécution et de mouvements de fonds seront acheminées vers votre numéro de téléphone via WhatsApp et SMS (${user.phone}).',
+                      '💬 Consentement de notification :\nLes alertes d\'exécution et de mouvements de fonds seront acheminées vers votre numéro de téléphone via WhatsApp et SMS (${user.phone.isNotEmpty ? user.phone : 'non renseigné'}).',
                       style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), height: 1.3),
                     ),
                   ),

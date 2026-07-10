@@ -16,15 +16,16 @@ class CashWallet {
   });
 
   factory CashWallet.fromJson(Map<String, dynamic> json) {
-    final total = (json['balanceTotal'] as num).toDouble();
-    final frozen = (json['balanceFrozen'] as num).toDouble();
+    final total = (json['balanceTotal'] as num?)?.toDouble() ?? 0.0;
+    final frozen = (json['balanceFrozen'] as num?)?.toDouble() ?? 0.0;
+    final available = (json['balanceAvailable'] as num?)?.toDouble() ?? (total - frozen);
     return CashWallet(
-      id: json['id'],
-      userId: json['userId'],
+      id: (json['id'] as String?) ?? '',
+      userId: (json['userId'] as String?) ?? '',
       balanceTotal: total,
       balanceFrozen: frozen,
-      balanceAvailable: (json['balanceAvailable'] as num?)?.toDouble() ?? (total - frozen),
-      currency: json['currency'] ?? 'XOF',
+      balanceAvailable: available,
+      currency: (json['currency'] as String?) ?? 'XOF',
     );
   }
 }
@@ -46,11 +47,11 @@ class SecuritiesWallet {
 
   factory SecuritiesWallet.fromJson(Map<String, dynamic> json) {
     return SecuritiesWallet(
-      id: json['id'],
-      userId: json['userId'],
-      codeValeur: json['codeValeur'],
-      quantity: json['quantity'] as int,
-      averageBuyPrice: (json['averageBuyPrice'] as num).toDouble(),
+      id: (json['id'] as String?) ?? '',
+      userId: (json['userId'] as String?) ?? '',
+      codeValeur: (json['codeValeur'] as String?) ?? '',
+      quantity: (json['quantity'] as num?)?.toInt() ?? 0,
+      averageBuyPrice: (json['averageBuyPrice'] as num?)?.toDouble() ?? 0.0,
     );
   }
 }

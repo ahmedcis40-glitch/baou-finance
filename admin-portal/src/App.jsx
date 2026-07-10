@@ -337,7 +337,6 @@ export default function App() {
           <h1 className="text-xl md:text-2xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 flex items-center gap-2">
             <Coins className="text-indigo-400" /> Plateforme Digitale SGI BRVM
           </h1>
-          <p className="text-xs text-gray-400">Simulation de KYC, Portefeuilles, Ordres & Webhook Mobile Money (Wave / Orange / MTN)</p>
         </div>
         
         <div className="flex items-center gap-4">

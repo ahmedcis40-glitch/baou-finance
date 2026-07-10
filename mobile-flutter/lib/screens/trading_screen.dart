@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/api_service.dart';
+import '../models/wallet.dart';
 
 class TradingScreen extends StatefulWidget {
   const TradingScreen({super.key});
@@ -18,6 +19,7 @@ class _TradingScreenState extends State<TradingScreen> {
   String _validity = 'JOUR'; // 'JOUR' | 'MENSUEL' | 'REVOCATION'
   double _commissions = 0;
   double _totalEstimated = 0;
+  bool _submitting = false;
 
   final List<Map<String, dynamic>> _stocks = [
     {'code': 'SNTS', 'name': 'Sonatel CI', 'price': 16500},
@@ -51,12 +53,33 @@ class _TradingScreenState extends State<TradingScreen> {
   }
 
   Future<void> _placeOrder() async {
+    if (_submitting) return;
     final api = context.read<ApiService>();
     final qty = int.tryParse(_qtyController.text) ?? 0;
     final price = double.tryParse(_priceController.text) ?? 0;
 
     if (qty <= 0 || price <= 0) return;
 
+    // Vérification de solde côté Flutter (Article 54 AMF-UMOA) — uniquement pour les ordres d'achat
+    if (_orderType == 'ACHAT') {
+      try {
+        final CashWallet wallet = await api.getCashWallet();
+        if (wallet.balanceAvailable < _totalEstimated) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Solde insuffisant pour couvrir l\'achat et les frais associés'),
+              backgroundColor: Colors.red,
+            ),
+          );
+          return;
+        }
+      } catch (_) {
+        // En cas d'échec de vérification du solde, on laisse passer et le backend gère
+      }
+    }
+
+    setState(() => _submitting = true);
     try {
       await api.createOrder({
         'type': _orderType,
@@ -74,9 +97,12 @@ class _TradingScreenState extends State<TradingScreen> {
       // Reset form
       _qtyController.text = '10';
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erreur: $e')),
       );
+    } finally {
+      if (mounted) setState(() => _submitting = false);
     }
   }
 
@@ -220,7 +246,7 @@ class _TradingScreenState extends State<TradingScreen> {
           const SizedBox(height: 32),
 
           ElevatedButton(
-            onPressed: _placeOrder,
+            onPressed: _submitting ? null : _placeOrder,
             style: ElevatedButton.styleFrom(
               backgroundColor: _orderType == 'ACHAT' ? const Color(0xFF009E49) : const Color(0xFFFF8200),
               foregroundColor: Colors.white,
@@ -229,12 +255,17 @@ class _TradingScreenState extends State<TradingScreen> {
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            child: Text(
-              _orderType == 'ACHAT' 
-                  ? 'Soumettre Achat (Geler les fonds)' 
-                  : 'Soumettre Vente (Escrow titres)',
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
-            ),
+            child: _submitting
+                ? const SizedBox(
+                    width: 20, height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
+                : Text(
+                    _orderType == 'ACHAT' 
+                        ? 'Soumettre Achat (Geler les fonds)' 
+                        : 'Soumettre Vente (Escrow titres)',
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                  ),
           )
         ],
       ),

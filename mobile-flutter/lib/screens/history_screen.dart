@@ -88,7 +88,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                   style: const TextStyle(color: Color(0xFF475569), fontSize: 12),
                                 ),
                                 Text(
-                                  'Le ${ord.createdAt.day}/${ord.createdAt.month} à ${ord.createdAt.hour}:${ord.createdAt.minute}',
+                                'Le ${ord.createdAt.day}/${ord.createdAt.month} à ${ord.createdAt.hour}:${ord.createdAt.minute.toString().padLeft(2, '0')}',
                                   style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 10),
                                 ),
                               ],

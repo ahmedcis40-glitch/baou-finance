@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { WalletsService } from '../wallets/wallets.service';
 import { PawaPayTxStatus, PawaPayTxType } from '@prisma/client';
@@ -6,19 +6,55 @@ import * as crypto from 'crypto';
 
 export const PAWAPAY_WEBHOOK_SECRET = 'pawapay-shared-secret-key-for-local-development-12345';
 
+// PawaPay Sandbox base URL
+const PAWAPAY_SANDBOX_BASE = 'https://api.sandbox.pawapay.cloud';
+const PAWAPAY_PROD_BASE = 'https://api.pawapay.io';
+
 @Injectable()
 export class PawaPayService {
+  private readonly logger = new Logger(PawaPayService.name);
+
   constructor(
     private prisma: PrismaService,
     private walletsService: WalletsService,
   ) {}
 
-  async initiateDeposit(userId: string, amount: number) {
+  private getBaseUrl(): string {
+    return process.env.PAWAPAY_ENVIRONMENT === 'production'
+      ? PAWAPAY_PROD_BASE
+      : PAWAPAY_SANDBOX_BASE;
+  }
+
+  private getApiToken(): string | null {
+    const token = process.env.PAWAPAY_API_TOKEN;
+    if (!token || token === 'placeholder' || token.trim() === '') return null;
+    return token;
+  }
+
+  // Detect correspondent from phone number prefix
+  private detectCorrespondent(phone: string): { correspondent: string; country: string } {
+    const clean = phone.replace(/[\s\+]/g, '');
+    // Côte d'Ivoire (+225)
+    if (clean.startsWith('225') || clean.startsWith('07') || clean.startsWith('05') || clean.startsWith('01')) {
+      if (clean.startsWith('22507') || clean.startsWith('07')) return { correspondent: 'WAVE_CIV', country: 'CIV' };
+      if (clean.startsWith('22505') || clean.startsWith('05')) return { correspondent: 'MTN_MOMO_CIV', country: 'CIV' };
+      if (clean.startsWith('22501') || clean.startsWith('01')) return { correspondent: 'ORANGE_CIV', country: 'CIV' };
+      return { correspondent: 'WAVE_CIV', country: 'CIV' }; // default CI
+    }
+    // Sénégal (+221)
+    if (clean.startsWith('221')) return { correspondent: 'ORANGE_SEN', country: 'SEN' };
+    // Burkina Faso (+226)
+    if (clean.startsWith('226')) return { correspondent: 'ORANGE_BFA', country: 'BFA' };
+    // Default fallback for sandbox testing
+    return { correspondent: 'MTN_MOMO_GHA', country: 'GHA' };
+  }
+
+  async initiateDeposit(userId: string, amount: number, phone?: string) {
     if (amount <= 0) {
       throw new BadRequestException("Le montant doit être supérieur à zéro.");
     }
 
-    // Check client status
+    // Check client KYC status
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user || user.kycStatus !== 'APPROUVE') {
       throw new BadRequestException("Le KYC du compte doit être APPROUVE pour recharger.");
@@ -40,120 +76,229 @@ export class PawaPayService {
         userId,
         action: 'DEPOSIT_INITIATE',
         details: JSON.stringify({ amount, idInternal: transaction.idInternal }),
-        ipAddress: '127.0.0.1'
-      }
+        ipAddress: '127.0.0.1',
+      },
     });
 
-    // REAL PAWAPAY INTEGRATION (If API Token is provided)
-    const apiToken = process.env.PAWAPAY_API_TOKEN;
-    if (apiToken && apiToken !== 'placeholder' && apiToken.trim() !== '') {
-      const isProd = process.env.PAWAPAY_ENVIRONMENT === 'production';
-      const apiUrl = isProd 
-        ? 'https://api.pawapay.io/v1/widget/sessions' 
-        : 'https://api.sandbox.pawapay.cloud/v1/widget/sessions';
+    const apiToken = this.getApiToken();
+    if (apiToken) {
+      // Try PawaPay Hosted Checkout (widget/sessions) first
+      const widgetUrl = `${this.getBaseUrl()}/v1/widget/sessions`;
+      const returnUrl = process.env.PAWAPAY_RETURN_URL || 'https://baoufinance-api.loca.lt/pawapay/return';
 
       try {
-        const response = await fetch(apiUrl, {
+        this.logger.log(`[PawaPay] Initiating deposit ${transaction.idInternal} - amount: ${amount} XOF`);
+        const response = await fetch(widgetUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiToken}`
+            'Authorization': `Bearer ${apiToken}`,
           },
           body: JSON.stringify({
             depositId: transaction.idInternal,
-            amount: amount.toString(),
+            amount: amount.toFixed(2),
             currency: 'XOF',
-            returnUrl: process.env.PAWAPAY_RETURN_URL || 'http://localhost:3001/#portfolio'
-          })
+            returnUrl: returnUrl,
+            webhookUrl: process.env.PAWAPAY_WEBHOOK_URL || 'https://baoufinance-api.loca.lt/pawapay/webhook',
+            reason: 'Dépôt BAOU Finance',
+          }),
         });
 
+        const responseText = await response.text();
+        this.logger.log(`[PawaPay] Widget session response: ${response.status} ${responseText}`);
+
         if (response.ok) {
-          const data = await response.json();
+          const data = JSON.parse(responseText);
           if (data && data.redirectUrl) {
             return {
-              message: "Dépôt initié via PawaPay.",
+              message: "Dépôt initié via PawaPay Hosted Checkout.",
               transactionId: transaction.idInternal,
               paymentUrl: data.redirectUrl,
+              mode: 'pawapay_live',
             };
           }
-        } else {
-          const errText = await response.text();
-          console.warn("PawaPay Hosted Checkout API returned error status:", response.status, errText);
         }
+        this.logger.warn(`[PawaPay] Widget session failed, trying direct deposit API...`);
       } catch (error) {
-        console.error("Failed to connect to PawaPay API, using sandbox simulation fallback:", error.message);
+        this.logger.error(`[PawaPay] Widget session error: ${error.message}`);
+      }
+
+      // Fallback: Try direct deposit API
+      const depositUrl = `${this.getBaseUrl()}/deposits`;
+      const phoneNumber = phone || user.phone;
+      const { correspondent, country } = this.detectCorrespondent(phoneNumber || '2250700000000');
+      const cleanPhone = (phoneNumber || '2250700000000').replace(/[\s\+]/g, '');
+
+      try {
+        const response = await fetch(depositUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiToken}`,
+          },
+          body: JSON.stringify({
+            depositId: transaction.idInternal,
+            amount: amount.toFixed(2),
+            currency: 'XOF',
+            country,
+            correspondent,
+            payer: {
+              type: 'MSISDN',
+              address: { value: cleanPhone },
+            },
+            customerTimestamp: new Date().toISOString(),
+            statementDescription: 'Depot BAOU Finance',
+          }),
+        });
+
+        const responseText = await response.text();
+        this.logger.log(`[PawaPay] Direct deposit response: ${response.status} ${responseText}`);
+
+        if (response.ok || response.status === 202) {
+          const data = JSON.parse(responseText);
+          return {
+            message: "Dépôt initié via PawaPay Direct API. Confirmez sur votre téléphone.",
+            transactionId: transaction.idInternal,
+            paymentUrl: null,
+            pawaPayDepositId: data.depositId,
+            status: data.status,
+            mode: 'pawapay_direct',
+          };
+        }
+        this.logger.warn(`[PawaPay] Direct deposit also failed: ${response.status} ${responseText}`);
+      } catch (error) {
+        this.logger.error(`[PawaPay] Direct deposit error: ${error.message}`);
       }
     }
 
     // Local Sandbox Simulator URL fallback
+    this.logger.warn('[PawaPay] No valid API token or all PawaPay calls failed. Returning sandbox simulation URL.');
     return {
-      message: "Dépôt initié via PawaPay (Mode Sandbox).",
+      message: "Dépôt initié (Mode Sandbox de test).",
       transactionId: transaction.idInternal,
-      paymentUrl: `https://pawapay-gate.com/pay/${transaction.idInternal}`,
+      paymentUrl: `https://sandbox.pawapay.cloud/demo/pay?depositId=${transaction.idInternal}`,
+      mode: 'sandbox_simulation',
     };
   }
 
-  async handleWebhook(payload: any, signature: string) {
-    // Cryptographic validation of webhook signature
-    const calculatedSignature = this.generateSignature(payload);
-    if (calculatedSignature !== signature) {
-      throw new BadRequestException("Signature de Webhook PawaPay invalide.");
+  async handleReturn(depositId: string) {
+    // Called when user returns from PawaPay hosted page
+    if (!depositId) return { message: 'Dépôt en attente de confirmation.', status: 'PENDING' };
+
+    const transaction = await this.prisma.pawaPayTransaction.findUnique({
+      where: { idInternal: depositId },
+    });
+
+    if (!transaction) return { message: 'Transaction introuvable.', status: 'NOT_FOUND' };
+
+    // Check PawaPay for real status if we have a token
+    const apiToken = this.getApiToken();
+    if (apiToken && transaction.status === PawaPayTxStatus.EN_COURS) {
+      try {
+        const url = `${this.getBaseUrl()}/deposits/${depositId}`;
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${apiToken}` },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          this.logger.log(`[PawaPay] Deposit status check: ${JSON.stringify(data)}`);
+          if (data.status === 'COMPLETED') {
+            await this.creditDeposit(transaction, data.amount || transaction.amount, data.depositId);
+          }
+        }
+      } catch (e) {
+        this.logger.error(`[PawaPay] Return status check error: ${e.message}`);
+      }
     }
 
-    const { idInternal, idPawaPay, status, amount } = payload;
+    return {
+      message: 'Retour de paiement reçu.',
+      transactionId: depositId,
+      status: transaction.status,
+    };
+  }
+
+  private async creditDeposit(transaction: any, amount: number, idPawaPay: string) {
+    if (transaction.status === PawaPayTxStatus.SUCCES) return;
+
+    await this.prisma.pawaPayTransaction.update({
+      where: { idInternal: transaction.idInternal },
+      data: { idPawaPay, status: PawaPayTxStatus.SUCCES },
+    });
+
+    await this.walletsService.depositCash(transaction.userId, Number(amount));
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId: transaction.userId,
+        action: 'DEPOSIT_SUCCESS',
+        details: JSON.stringify({ amount, idInternal: transaction.idInternal, idPawaPay }),
+        ipAddress: '127.0.0.1',
+      },
+    });
+  }
+
+  async handleWebhook(payload: any) {
+    // PawaPay Real Webhook Format:
+    // { depositId, payoutId, refundId, status, amount, currency, ... }
+    this.logger.log(`[PawaPay] Webhook received: ${JSON.stringify(payload)}`);
+
+    const idInternal = payload.depositId || payload.payoutId;
+    const status = payload.status;
+    const amount = Number(payload.amount);
+    const idPawaPay = payload.depositId || payload.payoutId;
+
+    if (!idInternal) {
+      this.logger.warn('[PawaPay] Webhook missing depositId/payoutId');
+      return { message: 'OK' };
+    }
 
     const transaction = await this.prisma.pawaPayTransaction.findUnique({
       where: { idInternal },
     });
 
     if (!transaction) {
-      throw new NotFoundException("Transaction PawaPay introuvable.");
+      this.logger.warn(`[PawaPay] Transaction not found: ${idInternal}`);
+      return { message: 'OK' }; // Always return 200 to PawaPay
     }
 
     if (transaction.status !== PawaPayTxStatus.EN_COURS) {
       return { message: "Transaction déjà traitée." };
     }
 
-    const finalStatus = status === 'SUCCESS' ? PawaPayTxStatus.SUCCES : PawaPayTxStatus.ECHEC;
+    const isSuccess = status === 'COMPLETED';
+    const finalStatus = isSuccess ? PawaPayTxStatus.SUCCES : PawaPayTxStatus.ECHEC;
 
-    // Update transaction
     await this.prisma.pawaPayTransaction.update({
       where: { idInternal },
-      data: {
-        idPawaPay,
-        status: finalStatus,
-        webhookSignature: signature,
-      },
+      data: { idPawaPay, status: finalStatus },
     });
 
-    // If success, credit or debit wallet balance
-    if (finalStatus === PawaPayTxStatus.SUCCES) {
+    if (isSuccess) {
       if (transaction.type === PawaPayTxType.DEPOT) {
-        await this.walletsService.depositCash(transaction.userId, amount);
+        await this.walletsService.depositCash(transaction.userId, amount || transaction.amount);
       } else if (transaction.type === PawaPayTxType.RETRAIT) {
-        await this.walletsService.withdrawCash(transaction.userId, amount);
+        await this.walletsService.withdrawCash(transaction.userId, transaction.amount);
       }
     }
 
-    // Write audit log
-    const actionName = transaction.type === PawaPayTxType.DEPOT
-      ? (finalStatus === PawaPayTxStatus.SUCCES ? 'DEPOSIT_SUCCESS' : 'DEPOSIT_FAILED')
-      : (finalStatus === PawaPayTxStatus.SUCCES ? 'WITHDRAW_SUCCESS' : 'WITHDRAW_FAILED');
+    const actionName =
+      transaction.type === PawaPayTxType.DEPOT
+        ? (isSuccess ? 'DEPOSIT_SUCCESS' : 'DEPOSIT_FAILED')
+        : (isSuccess ? 'WITHDRAW_SUCCESS' : 'WITHDRAW_FAILED');
 
     await this.prisma.auditLog.create({
       data: {
         userId: transaction.userId,
         action: actionName,
-        details: JSON.stringify({ amount, idInternal, idPawaPay }),
-        ipAddress: '127.0.0.1'
-      }
+        details: JSON.stringify({ amount, idInternal, idPawaPay, status }),
+        ipAddress: '127.0.0.1',
+      },
     });
 
-    return {
-      message: "Transaction traitée avec succès.",
-      status: finalStatus,
-      amount,
-    };
+    return { message: "Webhook PawaPay traité." };
   }
 
   async initiateWithdrawal(userId: string, amount: number) {
@@ -169,10 +314,12 @@ export class PawaPayService {
     // Verify cash wallet balance
     const wallet = await this.walletsService.getCashWallet(userId);
     if (wallet.balanceAvailable < amount) {
-      throw new BadRequestException(`Solde disponible insuffisant (${wallet.balanceAvailable.toLocaleString()} F) pour retirer ${amount.toLocaleString()} F.`);
+      throw new BadRequestException(
+        `Solde insuffisant (${wallet.balanceAvailable.toLocaleString()} F CFA) pour retirer ${amount.toLocaleString()} F CFA.`
+      );
     }
 
-    // Create pending internal withdrawal transaction
+    // Create pending withdrawal transaction
     const transaction = await this.prisma.pawaPayTransaction.create({
       data: {
         userId,
@@ -182,70 +329,65 @@ export class PawaPayService {
       },
     });
 
-    // Write audit log
     await this.prisma.auditLog.create({
       data: {
         userId,
         action: 'WITHDRAW_INITIATE',
         details: JSON.stringify({ amount, idInternal: transaction.idInternal }),
-        ipAddress: '127.0.0.1'
-      }
+        ipAddress: '127.0.0.1',
+      },
     });
 
-    // REAL PAWAPAY PAYOUT INTEGRATION (If API Token is provided)
-    const apiToken = process.env.PAWAPAY_API_TOKEN;
-    if (apiToken && apiToken !== 'placeholder' && apiToken.trim() !== '') {
-      const isProd = process.env.PAWAPAY_ENVIRONMENT === 'production';
-      const apiUrl = isProd 
-        ? 'https://api.pawapay.io/payouts' 
-        : 'https://api.sandbox.pawapay.io/payouts';
+    const apiToken = this.getApiToken();
+    if (apiToken) {
+      const payoutUrl = `${this.getBaseUrl()}/payouts`;
+      const phoneNumber = user.phone || '';
+      const { correspondent, country } = this.detectCorrespondent(phoneNumber);
+      const cleanPhone = phoneNumber.replace(/[\s\+]/g, '');
 
       try {
-        // Clean phone format
-        let phoneClean = user.phone.replace(/[\s\+]/g, '');
-        const response = await fetch(apiUrl, {
+        this.logger.log(`[PawaPay] Initiating payout ${transaction.idInternal} - ${amount} XOF to ${cleanPhone}`);
+        const response = await fetch(payoutUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiToken}`
+            'Authorization': `Bearer ${apiToken}`,
           },
           body: JSON.stringify({
             payoutId: transaction.idInternal,
-            amount: amount.toString(),
+            amount: amount.toFixed(2),
             currency: 'XOF',
-            country: 'CIV',
-            correspondent: 'WAVE_CIV', // Or MTN_CIV, ORANGE_CIV
+            country,
+            correspondent,
             recipient: {
               type: 'MSISDN',
-              address: {
-                value: phoneClean
-              }
+              address: { value: cleanPhone || '2250700000000' },
             },
             customerTimestamp: new Date().toISOString(),
-            statementDescription: 'Retrait BAOU Finance'
-          })
+            statementDescription: 'Retrait BAOU Finance',
+          }),
         });
 
-        if (response.ok) {
+        const responseText = await response.text();
+        this.logger.log(`[PawaPay] Payout response: ${response.status} ${responseText}`);
+
+        if (response.ok || response.status === 202) {
           return {
-            message: "Retrait initié via PawaPay Payout.",
+            message: "Retrait initié via PawaPay. Vous recevrez les fonds sur votre Mobile Money.",
             transactionId: transaction.idInternal,
-            paymentUrl: `https://pawapay-gate.com/payout/${transaction.idInternal}`, // Fallback sandbox view
+            mode: 'pawapay_live',
           };
-        } else {
-          const errText = await response.text();
-          console.warn("PawaPay Payout API returned error status:", response.status, errText);
         }
+        this.logger.warn(`[PawaPay] Payout failed: ${response.status} ${responseText}`);
       } catch (error) {
-        console.error("Failed to connect to PawaPay Payout API, using sandbox simulation fallback:", error.message);
+        this.logger.error(`[PawaPay] Payout error: ${error.message}`);
       }
     }
 
-    // Local Sandbox Simulator URL fallback
     return {
-      message: "Retrait initié via PawaPay Payout (Mode Sandbox).",
+      message: "Retrait initié (Mode Sandbox). Les fonds seront envoyés sur votre Mobile Money.",
       transactionId: transaction.idInternal,
-      paymentUrl: `https://pawapay-gate.com/payout/${transaction.idInternal}`,
+      mode: 'sandbox_simulation',
     };
   }
 
@@ -256,7 +398,6 @@ export class PawaPayService {
       status: payload.status,
       amount: payload.amount,
     });
-
     return crypto
       .createHmac('sha256', PAWAPAY_WEBHOOK_SECRET)
       .update(dataString)
@@ -274,13 +415,7 @@ export class PawaPayService {
     return this.prisma.pawaPayTransaction.findMany({
       include: {
         user: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-            phone: true,
-          },
+          select: { id: true, email: true, firstName: true, lastName: true, phone: true },
         },
       },
       orderBy: { createdAt: 'desc' },

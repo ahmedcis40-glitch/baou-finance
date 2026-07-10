@@ -55,8 +55,7 @@ class SgiApp extends StatelessWidget {
         colorScheme: const ColorScheme.light(
           primary: Color(0xFFFF8200),
           secondary: Color(0xFF009E49),
-          surface: Colors.white,
-          background: Color(0xFFF8FAFC),
+          surface: Color(0xFFF8FAFC),
         ),
         inputDecorationTheme: const InputDecorationTheme(
           border: OutlineInputBorder(
@@ -127,6 +126,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
       final profile = await api.getProfile();
       state.setUser(profile);
     } catch (_) {
+      if (!mounted) return;
       state.setUser(null);
     }
   }

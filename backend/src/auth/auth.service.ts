@@ -68,7 +68,10 @@ export class AuthService {
         role: true,
         kycStatus: true,
         consentWhatsApp: true,
+        consentSMS: true,
         investorProfile: true,
+        investorHorizon: true,
+        investorObjective: true,
         sgiPartenaire: true,
       },
     });

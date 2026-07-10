@@ -35,6 +35,7 @@ class _DcaScreenState extends State<DcaScreen> {
         _plans = plans;
       });
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erreur DCA: $e')),
       );
@@ -58,6 +59,7 @@ class _DcaScreenState extends State<DcaScreen> {
         );
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erreur: $e')),
       );
@@ -70,6 +72,7 @@ class _DcaScreenState extends State<DcaScreen> {
       await api.toggleDcaPlan(id);
       _loadPlans();
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erreur: $e')),
       );
@@ -87,6 +90,7 @@ class _DcaScreenState extends State<DcaScreen> {
         );
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erreur: $e')),
       );
@@ -109,7 +113,7 @@ class _DcaScreenState extends State<DcaScreen> {
                   style: const TextStyle(color: Color(0xFF0F172A)),
                   decoration: const InputDecoration(labelText: 'Action cible'),
                   items: _symbols.map((s) => DropdownMenuItem(value: s, child: Text(s))).toList(),
-                  onChanged: (val) => setDialogState(() => _selectedSymbol = val!),
+                  onChanged: (val) { if (val != null) setDialogState(() => _selectedSymbol = val); },
                 ),
                 const SizedBox(height: 8),
                 TextField(
@@ -125,7 +129,7 @@ class _DcaScreenState extends State<DcaScreen> {
                   style: const TextStyle(color: Color(0xFF0F172A)),
                   decoration: const InputDecoration(labelText: 'Fréquence'),
                   items: _frequencies.map((f) => DropdownMenuItem(value: f, child: Text(f))).toList(),
-                  onChanged: (val) => setDialogState(() => _selectedFrequency = val!),
+                  onChanged: (val) { if (val != null) setDialogState(() => _selectedFrequency = val); },
                 ),
               ],
             ),
@@ -182,7 +186,11 @@ class _DcaScreenState extends State<DcaScreen> {
                             style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
                           ),
                           subtitle: Text(
-                            'Investissement : ${plan['amount']} XOF\nProchaine exécution : ${plan['nextRun'].toString().substring(0, 10)}',
+                            () {
+                              final nextRun = plan['nextRun'] as String?;
+                              final nextRunDisplay = (nextRun != null && nextRun.length >= 10) ? nextRun.substring(0, 10) : 'N/A';
+                              return 'Investissement : ${plan['amount']} XOF\nProchaine exécution : $nextRunDisplay';
+                            }(),
                             style: const TextStyle(color: Color(0xFF475569)),
                           ),
                           trailing: Row(
@@ -193,11 +201,11 @@ class _DcaScreenState extends State<DcaScreen> {
                                   isActive ? Icons.pause_circle_outline : Icons.play_circle_outline,
                                   color: isActive ? Colors.amber : Colors.green,
                                 ),
-                                onPressed: () => _togglePlan(plan['id']),
+                                onPressed: () => _togglePlan((plan['id'] as String?) ?? ''),
                               ),
                               IconButton(
                                 icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                                onPressed: () => _deletePlan(plan['id']),
+                                onPressed: () => _deletePlan((plan['id'] as String?) ?? ''),
                               ),
                             ],
                           ),

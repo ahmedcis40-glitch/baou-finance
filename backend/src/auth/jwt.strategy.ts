@@ -22,8 +22,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         firstName: true,
         lastName: true,
         phone: true,
+        whatsappPhone: true,
         role: true,
         kycStatus: true,
+        sgiPartenaire: true,
+        investorProfile: true,
+        investorHorizon: true,
+        investorObjective: true,
+        consentSMS: true,
+        consentWhatsApp: true,
       },
     });
 

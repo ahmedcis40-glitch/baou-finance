@@ -34,16 +34,40 @@ class Order {
   });
 
   factory Order.fromJson(Map<String, dynamic> json) {
+    // Safe parsing of type enum
+    OrderType parsedType = OrderType.ACHAT;
+    try {
+      parsedType = OrderType.values.firstWhere(
+        (e) => e.toString().split('.').last == (json['type'] as String? ?? 'ACHAT'),
+      );
+    } catch (_) {}
+
+    // Safe parsing of status enum
+    OrderStatus parsedStatus = OrderStatus.EN_ATTENTE;
+    try {
+      parsedStatus = OrderStatus.values.firstWhere(
+        (e) => e.toString().split('.').last == (json['status'] as String? ?? 'EN_ATTENTE'),
+      );
+    } catch (_) {}
+
+    // Safe date parsing
+    DateTime parsedDate;
+    try {
+      parsedDate = DateTime.parse(json['createdAt'] as String? ?? DateTime.now().toIso8601String());
+    } catch (_) {
+      parsedDate = DateTime.now();
+    }
+
     return Order(
-      id: json['id'],
-      userId: json['userId'],
-      type: OrderType.values.firstWhere((e) => e.toString().split('.').last == json['type']),
-      codeValeur: json['codeValeur'],
-      quantityRequested: json['quantityRequested'] as int,
-      priceRequested: (json['priceRequested'] as num).toDouble(),
-      priceReal: json['priceReal'] != null ? (json['priceReal'] as num).toDouble() : null,
-      status: OrderStatus.values.firstWhere((e) => e.toString().split('.').last == json['status']),
-      createdAt: DateTime.parse(json['createdAt']),
+      id: (json['id'] as String?) ?? '',
+      userId: (json['userId'] as String?) ?? '',
+      type: parsedType,
+      codeValeur: (json['codeValeur'] as String?) ?? '',
+      quantityRequested: (json['quantityRequested'] as num?)?.toInt() ?? 0,
+      priceRequested: (json['priceRequested'] as num?)?.toDouble() ?? 0.0,
+      priceReal: (json['priceReal'] as num?)?.toDouble(),
+      status: parsedStatus,
+      createdAt: parsedDate,
     );
   }
 }

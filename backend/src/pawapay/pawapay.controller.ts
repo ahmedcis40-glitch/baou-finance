@@ -1,4 +1,8 @@
-import { Controller, Post, Get, Body, Headers, UseGuards, Request, BadRequestException } from '@nestjs/common';
+import {
+  Controller, Post, Get, Body, Headers,
+  UseGuards, Request, BadRequestException, Query, Res
+} from '@nestjs/common';
+import type { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { PawaPayService } from './pawapay.service';
 import { RolesGuard } from '../auth/roles.guard';
@@ -9,24 +13,42 @@ import { Role } from '@prisma/client';
 export class PawaPayController {
   constructor(private pawaPayService: PawaPayService) {}
 
+  // ── Client: Initiate deposit (creates a PawaPay Hosted Checkout session)
   @UseGuards(AuthGuard('jwt'))
   @Post('deposit')
-  async initiateDeposit(@Body('amount') amount: number, @Request() req: any) {
-    return this.pawaPayService.initiateDeposit(req.user.id, amount);
+  async initiateDeposit(
+    @Body('amount') amount: number,
+    @Body('phone') phone: string,
+    @Request() req: any,
+  ) {
+    return this.pawaPayService.initiateDeposit(req.user.id, amount, phone);
   }
 
+  // ── Client: Initiate withdrawal (PawaPay Payout API)
   @UseGuards(AuthGuard('jwt'))
   @Post('withdraw')
   async initiateWithdrawal(@Body('amount') amount: number, @Request() req: any) {
     return this.pawaPayService.initiateWithdrawal(req.user.id, amount);
   }
 
+  // ── Client: Return URL after PawaPay hosted checkout completes
+  // PawaPay redirects here with ?depositId=xxx after payment
+  @Get('return')
+  async handleReturn(@Query('depositId') depositId: string, @Res() res: Response) {
+    await this.pawaPayService.handleReturn(depositId);
+    // Redirect user back to the client app
+    const clientUrl = process.env.CLIENT_APP_URL || 'http://localhost:5173';
+    res.redirect(`${clientUrl}/#/wallet?payment=success&id=${depositId}`);
+  }
+
+  // ── Client: Get my transactions
   @UseGuards(AuthGuard('jwt'))
   @Get('my')
   async getMyTransactions(@Request() req: any) {
     return this.pawaPayService.getTransactions(req.user.id);
   }
 
+  // ── Admin: Get all transactions
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(Role.ADMIN_KYC, Role.TRADER)
   @Get('admin')
@@ -34,34 +56,27 @@ export class PawaPayController {
     return this.pawaPayService.getAllTransactions();
   }
 
+  // ── PawaPay Real Webhook (called by PawaPay servers when payment completes)
+  // No auth required — PawaPay calls this endpoint directly
   @Post('webhook')
-  async handleWebhook(
-    @Body() payload: any,
-    @Headers('x-pawapay-signature') signature: string,
-  ) {
-    if (!signature) {
-      throw new BadRequestException("En-tête x-pawapay-signature manquant.");
-    }
-    return this.pawaPayService.handleWebhook(payload, signature);
+  async handleWebhook(@Body() payload: any) {
+    // PawaPay sends: { depositId, status: 'COMPLETED'|'FAILED', amount, currency, ... }
+    return this.pawaPayService.handleWebhook(payload);
   }
 
+  // ── Dev tool: simulate a successful payment webhook for testing
   @Post('simulate-webhook')
   async simulateWebhook(@Body() simulationDto: any) {
     const { idInternal, status, amount } = simulationDto;
-
+    // Simulate a real PawaPay webhook payload format
     const payload = {
-      idInternal,
-      idPawaPay: `pawapay_tx_${Math.random().toString(36).substr(2, 9)}`,
-      status: status || 'SUCCESS',
+      depositId: idInternal,
+      payoutId: undefined,
+      status: status || 'COMPLETED',
       amount: Number(amount),
+      currency: 'XOF',
+      created: new Date().toISOString(),
     };
-
-    const signature = this.pawaPayService.generateSignature(payload);
-
-    return {
-      payload,
-      signature,
-      instructions: "Effectuez une requête POST vers /pawapay/webhook avec ces données et l'en-tête 'x-pawapay-signature'.",
-    };
+    return this.pawaPayService.handleWebhook(payload);
   }
 }
