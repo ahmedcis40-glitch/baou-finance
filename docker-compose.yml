@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  # 1. Base de données locale (PostgreSQL)
+  # Recrée un environnement de données identique à Supabase/production en local
+  db:
+    image: postgres:15-alpine
+    container_name: baou-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: BaouFinanceDb2026Password!
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # 2. Backend API (NestJS)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: baou-backend
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - DATABASE_URL=postgresql://postgres:BaouFinanceDb2026Password!@db:5432/postgres
+      - JWT_SECRET=superSecretJwtTokenKeyForBaou2026
+      # Mettre ici les clés pour d'autres passerelles (ex: PawaPay) si nécessaire
+    depends_on:
+      - db
+
+  # 3. Portail Client Web (React/Vite)
+  client-portal:
+    build:
+      context: ./client-portal
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE=http://localhost:3000
+    container_name: baou-client-portal
+    restart: always
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+
+  # 4. Portail Admin (React/Vite)
+  admin-portal:
+    build:
+      context: ./admin-portal
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE=http://localhost:3000
+    container_name: baou-admin-portal
+    restart: always
+    ports:
+      - "8081:80"
+    depends_on:
+      - backend
+
+  # 5. Simulateur Mobile Web (React/Vite)
+  mobile-simulator:
+    build:
+      context: ./mobile-simulator
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_BASE=http://localhost:3000
+    container_name: baou-mobile-simulator
+    restart: always
+    ports:
+      - "8082:80"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
