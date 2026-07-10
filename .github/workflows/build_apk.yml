@@ -31,6 +31,22 @@ jobs:
           cd mobile-flutter
           flutter create --project-name=baou . --platforms=android
 
+      - name: Patch Android - Allow HTTP cleartext traffic
+        run: |
+          mkdir -p mobile-flutter/android/app/src/main/res/xml
+          cat > mobile-flutter/android/app/src/main/res/xml/network_security_config.xml << 'EOF'
+          <?xml version="1.0" encoding="utf-8"?>
+          <network-security-config>
+            <base-config cleartextTrafficPermitted="true">
+              <trust-anchors>
+                <certificates src="system" />
+              </trust-anchors>
+            </base-config>
+          </network-security-config>
+          EOF
+          sed -i 's/<application/<application android:networkSecurityConfig="@xml\/network_security_config"/' \
+            mobile-flutter/android/app/src/main/AndroidManifest.xml
+
       - name: Install dependencies
         run: |
           cd mobile-flutter
