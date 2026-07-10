@@ -252,23 +252,7 @@ class ApiService {
     );
 
     if (response.statusCode == 201 || response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      
-      // Execute the actual webhook request
-      final postResponse = await http.post(
-        Uri.parse('$baseUrl/pawapay/webhook'),
-        headers: {
-          'Content-Type': 'application/json',
-          'x-pawapay-signature': data['signature']
-        },
-        body: jsonEncode(data['payload']),
-      );
-
-      if (postResponse.statusCode == 201 || postResponse.statusCode == 200) {
-        return jsonDecode(postResponse.body);
-      } else {
-        throw Exception('Échec de la validation du Webhook');
-      }
+      return jsonDecode(response.body);
     } else {
       throw Exception('Échec de la simulation du Webhook');
     }
