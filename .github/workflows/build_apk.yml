@@ -52,6 +52,11 @@ jobs:
           cd mobile-flutter
           flutter pub get
 
+      - name: Generate launcher icons
+        run: |
+          cd mobile-flutter
+          dart run flutter_launcher_icons
+
       - name: Build APK
         run: |
           cd mobile-flutter

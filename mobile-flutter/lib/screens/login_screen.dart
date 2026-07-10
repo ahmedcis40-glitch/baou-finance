@@ -162,23 +162,51 @@ class _LoginScreenState extends State<LoginScreen> {
                   Expanded(child: Container(height: 4, color: const Color(0xFF009E49))),
                 ],
               ),
-              const SizedBox(height: 30),
-              const Icon(Icons.account_balance, size: 64, color: Color(0xFFFF8200)),
-              const SizedBox(height: 16),
-              Text(
-                _isRegistering ? 'Ouverture de Compte Titres' : 'Portail Bourse SGI',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 24, 
-                  fontWeight: FontWeight.bold, 
-                  color: Color(0xFF0F172A),
+              const SizedBox(height: 20),
+              // BAOU Logo
+              Center(
+                child: Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFF8200).withOpacity(0.3),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: Image.asset(
+                      'assets/images/baou_logo.jpg',
+                      fit: BoxFit.cover,
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 16),
               const Text(
-                'Négociation de titres BRVM & Paiements Wave / Orange / MTN',
+                'BAOU',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Color(0xFF475569), fontSize: 13),
+                style: TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFFFF8200),
+                  letterSpacing: 4,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _isRegistering ? 'Ouverture de Compte Titres' : 'Négociation de titres BRVM',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF475569),
+                ),
               ),
               const SizedBox(height: 24),
 
