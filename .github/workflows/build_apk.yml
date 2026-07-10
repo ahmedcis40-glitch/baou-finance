@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch: # Permet de lancer la construction manuellement depuis l'onglet Actions sur GitHub
+  workflow_dispatch:
 
 jobs:
   build:
@@ -33,19 +33,17 @@ jobs:
 
       - name: Patch Android - Allow HTTP cleartext traffic
         run: |
+          # Copier le AndroidManifest.xml patché (avec usesCleartextTraffic + networkSecurityConfig)
+          cp mobile-flutter/android_patches/AndroidManifest.xml \
+             mobile-flutter/android/app/src/main/AndroidManifest.xml
+
+          # Copier le fichier network_security_config.xml
           mkdir -p mobile-flutter/android/app/src/main/res/xml
-          cat > mobile-flutter/android/app/src/main/res/xml/network_security_config.xml << 'EOF'
-          <?xml version="1.0" encoding="utf-8"?>
-          <network-security-config>
-            <base-config cleartextTrafficPermitted="true">
-              <trust-anchors>
-                <certificates src="system" />
-              </trust-anchors>
-            </base-config>
-          </network-security-config>
-          EOF
-          sed -i 's/<application/<application android:networkSecurityConfig="@xml\/network_security_config"/' \
-            mobile-flutter/android/app/src/main/AndroidManifest.xml
+          cp mobile-flutter/android_patches/network_security_config.xml \
+             mobile-flutter/android/app/src/main/res/xml/network_security_config.xml
+
+          echo "✅ Patch HTTP cleartext appliqué avec succès"
+          cat mobile-flutter/android/app/src/main/AndroidManifest.xml
 
       - name: Install dependencies
         run: |
