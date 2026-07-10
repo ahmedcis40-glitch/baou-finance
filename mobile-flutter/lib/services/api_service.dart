@@ -6,14 +6,7 @@ import '../models/wallet.dart';
 import '../models/order.dart';
 
 class ApiService {
-  // ======================================================
-  // CONFIGURATION : Développement Local WiFi
-  // ======================================================
-  // Pour se connecter via WiFi (téléphone sur le même réseau) :
-  static const String baseUrl = 'http://192.168.1.103:3000';
-  // Pour revenir à la production Render, remplacez par :
-  // static const String baseUrl = 'https://baou-finance.onrender.com';
-  // ======================================================
+  static const String baseUrl = 'https://baou-finance.onrender.com';
   String? _token;
 
   Future<String?> _getToken() async {
