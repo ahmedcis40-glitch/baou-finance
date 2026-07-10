@@ -6,7 +6,7 @@ import '../models/wallet.dart';
 import '../models/order.dart';
 
 class ApiService {
-  static const String baseUrl = 'https://baou-finance.onrender.com';
+  static const String baseUrl = 'http://192.168.1.103:3000';
   String? _token;
 
   Future<String?> _getToken() async {
