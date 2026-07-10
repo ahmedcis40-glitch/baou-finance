@@ -45,7 +45,7 @@ class SgiApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'SGI BRVM Bourse',
+      title: 'BAOU',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.light,

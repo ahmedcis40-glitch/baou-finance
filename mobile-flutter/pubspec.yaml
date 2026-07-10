@@ -1,5 +1,5 @@
-name: sgi_brvm_mobile
-description: A new Flutter application for SGI clients with Jeko and BRVM integration.
+name: baou
+description: Application mobile BAOU pour l'investissement et la négociation de titres BRVM.
 version: 1.0.0+1
 
 environment:
