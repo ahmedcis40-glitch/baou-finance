@@ -15,6 +15,7 @@ class _TradingScreenState extends State<TradingScreen> {
   final _qtyController = TextEditingController(text: '10');
   final _priceController = TextEditingController(text: '16500');
   
+  String _validity = 'JOUR'; // 'JOUR' | 'MENSUEL' | 'REVOCATION'
   double _commissions = 0;
   double _totalEstimated = 0;
 
@@ -62,6 +63,7 @@ class _TradingScreenState extends State<TradingScreen> {
         'codeValeur': _codeValeur,
         'quantityRequested': qty,
         'priceRequested': price,
+        'validity': _validity,
       });
 
       if (!mounted) return;
@@ -168,6 +170,30 @@ class _TradingScreenState extends State<TradingScreen> {
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 16),
+
+          // Validity Duration Selector (Mandated by BRVM/AMF UMOA Regulation)
+          DropdownButtonFormField<String>(
+            value: _validity,
+            dropdownColor: Colors.white,
+            style: const TextStyle(color: Color(0xFF0F172A)),
+            decoration: const InputDecoration(
+              labelText: 'Durée de validité de l\'ordre *',
+              border: OutlineInputBorder(),
+            ),
+            items: const [
+              DropdownMenuItem(value: 'JOUR', child: Text('Ordre Jour (Fin de séance)')),
+              DropdownMenuItem(value: 'MENSUEL', child: Text('Ordre Mensuel (Fin de mois)')),
+              DropdownMenuItem(value: 'REVOCATION', child: Text('Ordre à Révocation (GTC - 90j max)')),
+            ],
+            onChanged: (val) {
+              if (val != null) {
+                setState(() {
+                  _validity = val;
+                });
+              }
+            },
           ),
           const SizedBox(height: 24),
 

@@ -41,6 +41,8 @@ class _WalletScreenState extends State<WalletScreen> {
     }
   }
 
+  bool _isWithdraw = false;
+
   Future<void> _initiatePawaPayDeposit() async {
     final api = context.read<ApiService>();
     final amount = double.tryParse(_amountController.text) ?? 0;
@@ -50,7 +52,6 @@ class _WalletScreenState extends State<WalletScreen> {
       final result = await api.initiateDeposit(amount);
       final idInternal = result['transactionId'];
 
-      // Show mock USSD/payment success validation modal
       if (!mounted) return;
       showDialog(
         context: context,
@@ -71,7 +72,6 @@ class _WalletScreenState extends State<WalletScreen> {
             TextButton(
               onPressed: () async {
                 Navigator.pop(ctx);
-                // Simulate Webhook success call
                 try {
                   await api.simulateWebhook(idInternal, 'SUCCESS', amount);
                   _loadData();
@@ -97,6 +97,64 @@ class _WalletScreenState extends State<WalletScreen> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Erreur dépôt: $e')),
+      );
+    }
+  }
+
+  Future<void> _initiatePawaPayWithdrawal() async {
+    final api = context.read<ApiService>();
+    final amount = double.tryParse(_amountController.text) ?? 0;
+    if (amount <= 0) return;
+
+    try {
+      final result = await api.initiateWithdrawal(amount);
+      final idInternal = result['transactionId'];
+
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Retrait PawaPay (Wave/Orange/MTN)'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Montant à retirer: ${amount.toStringAsFixed(0)} XOF'),
+              const SizedBox(height: 12),
+              const Text(
+                'Saisissez votre code PIN Mobile Money pour valider la réception des fonds. (Simule le Webhook PawaPay)',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                try {
+                  await api.simulateWebhook(idInternal, 'SUCCESS', amount);
+                  _loadData();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Retrait validé avec succès via Webhook PawaPay !')),
+                    );
+                  }
+                } catch (err) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Erreur: $err')),
+                    );
+                  }
+                }
+              },
+              child: const Text('Confirmer le PIN (Succès)', style: TextStyle(color: Colors.greenAccent)),
+            ),
+          ],
+        ),
+      );
+
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur retrait: $e')),
       );
     }
   }
@@ -158,35 +216,70 @@ class _WalletScreenState extends State<WalletScreen> {
             ),
             const SizedBox(height: 20),
 
-            // PawaPay MM Deposit button trigger
+            // PawaPay MM Deposit & Withdrawal tabbed control
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Recharger via PawaPay (Wave, Orange, MTN)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Transactions Cash',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A)),
+                        ),
+                        Row(
+                          children: [
+                            ChoiceChip(
+                              label: const Text('Dépôt', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              selected: !_isWithdraw,
+                              selectedColor: const Color(0xFF009E49),
+                              labelStyle: TextStyle(color: !_isWithdraw ? Colors.white : const Color(0xFF0F172A)),
+                              backgroundColor: Colors.white,
+                              onSelected: (val) {
+                                if (val) setState(() => _isWithdraw = false);
+                              },
+                            ),
+                            const SizedBox(width: 8),
+                            ChoiceChip(
+                              label: const Text('Retrait', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                              selected: _isWithdraw,
+                              selectedColor: const Color(0xFFFF8200),
+                              labelStyle: TextStyle(color: _isWithdraw ? Colors.white : const Color(0xFF0F172A)),
+                              backgroundColor: Colors.white,
+                              onSelected: (val) {
+                                if (val) setState(() => _isWithdraw = true);
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
                     Row(
                       children: [
                         Expanded(
                           child: TextField(
                             controller: _amountController,
                             keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: 'Montant (XOF)',
-                              border: OutlineInputBorder(),
-                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            style: const TextStyle(color: Color(0xFF0F172A)),
+                            decoration: InputDecoration(
+                              labelText: _isWithdraw ? 'Montant à retirer (XOF)' : 'Montant à déposer (XOF)',
+                              border: const OutlineInputBorder(),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             ),
                           ),
                         ),
                         const SizedBox(width: 12),
                         ElevatedButton.icon(
-                          onPressed: _initiatePawaPayDeposit,
-                          icon: const Icon(Icons.send_rounded, size: 16),
-                          label: const Text('Déposer'),
+                          onPressed: _isWithdraw ? _initiatePawaPayWithdrawal : _initiatePawaPayDeposit,
+                          icon: Icon(_isWithdraw ? Icons.call_received_rounded : Icons.send_rounded, size: 16),
+                          label: Text(_isWithdraw ? 'Retirer' : 'Déposer'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green.shade700,
+                            backgroundColor: _isWithdraw ? const Color(0xFFFF8200) : const Color(0xFF009E49),
+                            foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                           ),
                         )

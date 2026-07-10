@@ -8,6 +8,7 @@ import 'screens/wallet_screen.dart';
 import 'screens/trading_screen.dart';
 import 'screens/history_screen.dart';
 import 'screens/dca_screen.dart';
+import 'screens/account_screen.dart';
 
 void main() {
   runApp(
@@ -160,37 +161,27 @@ class _HomeScreenState extends State<HomeScreen> {
     const TradingScreen(),
     const DcaScreen(),
     const HistoryScreen(),
+    const AccountScreen(),
   ];
 
   @override
   Widget build(BuildContext context) {
-    final user = context.watch<AppState>().currentUser;
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text('SGI Mobile Client', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, size: 18),
-            onPressed: () async {
-              await context.read<ApiService>().logout();
-              if (mounted) {
-                context.read<AppState>().setUser(null);
-              }
-            },
-          ),
-        ],
+        title: const Text('BAOU', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, letterSpacing: 2, color: Color(0xFFFF8200))),
+        centerTitle: true,
       ),
       body: _screens[_currentIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (idx) => setState(() => _currentIndex = idx),
-        type: BottomNavigationBarType.fixed, // Support 4 items
+        type: BottomNavigationBarType.fixed, // Support 5 items
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.account_balance_wallet_outlined), label: 'Portefeuille'),
           BottomNavigationBarItem(icon: Icon(Icons.trending_up_outlined), label: 'Négocier'),
           BottomNavigationBarItem(icon: Icon(Icons.autorenew_outlined), label: 'Autopilot DCA'),
           BottomNavigationBarItem(icon: Icon(Icons.history_outlined), label: 'Historique'),
+          BottomNavigationBarItem(icon: Icon(Icons.person_outline_rounded), label: 'Mon Compte'),
         ],
       ),
     );

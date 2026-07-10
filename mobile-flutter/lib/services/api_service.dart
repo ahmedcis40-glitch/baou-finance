@@ -130,6 +130,22 @@ class ApiService {
     }
   }
 
+  Future<Map<String, dynamic>> initiateWithdrawal(double amount) async {
+    final token = await _getToken();
+    final response = await http.post(
+      Uri.parse('$baseUrl/pawapay/withdraw'),
+      headers: _headers(token),
+      body: jsonEncode({'amount': amount}),
+    );
+
+    if (response.statusCode == 201) {
+      return jsonDecode(response.body);
+    } else {
+      final error = jsonDecode(response.body);
+      throw Exception(error['message'] ?? 'Erreur lors du retrait');
+    }
+  }
+
   // Brokerage Orders
   Future<Order> createOrder(Map<String, dynamic> orderDto) async {
     final token = await _getToken();
