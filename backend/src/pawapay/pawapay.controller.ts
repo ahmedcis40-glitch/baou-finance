@@ -57,10 +57,20 @@ export class PawaPayController {
   }
 
   // ── PawaPay Real Webhook (called by PawaPay servers when payment completes)
-  // No auth required — PawaPay calls this endpoint directly
   @Post('webhook')
-  async handleWebhook(@Body() payload: any) {
-    // PawaPay sends: { depositId, status: 'COMPLETED'|'FAILED', amount, currency, ... }
+  async handleWebhook(
+    @Body() payload: any,
+    @Headers('authorization') authHeader?: string,
+  ) {
+    const webhookSecret = process.env.PAWAPAY_WEBHOOK_SECRET || 'pawapay-shared-secret-key-for-local-development-12345';
+    
+    if (webhookSecret) {
+      const expectedBearer = `Bearer ${webhookSecret}`;
+      if (!authHeader || authHeader !== expectedBearer) {
+        throw new BadRequestException("Jeton de sécurité Webhook invalide ou absent.");
+      }
+    }
+    
     return this.pawaPayService.handleWebhook(payload);
   }
 
