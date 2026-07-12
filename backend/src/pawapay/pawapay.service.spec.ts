@@ -202,10 +202,10 @@ describe('PawaPayService', () => {
         status: 200,
         text: async () => JSON.stringify({ payoutId: 'pawapay-payout-555', status: 'ACCEPTED' }),
       });
-
       const result = await service.initiateWithdrawal(mockUserId, 4000);
 
       expect(prismaService.pawaPayTransaction.create).toHaveBeenCalled();
+      expect(walletsService.withdrawCash).toHaveBeenCalledWith(mockUserId, 4000);
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining('/payouts'),
         expect.any(Object)
@@ -242,7 +242,7 @@ describe('PawaPayService', () => {
       expect(walletsService.depositCash).toHaveBeenCalledWith('user-123', 25000);
     });
 
-    it('should deduct wallet balance on completed withdrawal webhook', async () => {
+    it('should not deduct wallet balance again on completed withdrawal webhook', async () => {
       const mockTx = {
         idInternal: 'tx-wd-456',
         userId: 'user-123',
@@ -265,10 +265,10 @@ describe('PawaPayService', () => {
         where: { idInternal: 'tx-wd-456' },
         data: { idPawaPay: 'tx-wd-456', status: PawaPayTxStatus.SUCCES },
       });
-      expect(walletsService.withdrawCash).toHaveBeenCalledWith('user-123', 15000);
+      expect(walletsService.withdrawCash).not.toHaveBeenCalled();
     });
 
-    it('should set status to ECHEC if webhook status is FAILED', async () => {
+    it('should set status to ECHEC if webhook status is FAILED for deposit', async () => {
       const mockTx = {
         idInternal: 'tx-123',
         userId: 'user-123',
@@ -292,6 +292,32 @@ describe('PawaPayService', () => {
         data: { idPawaPay: 'tx-123', status: PawaPayTxStatus.ECHEC },
       });
       expect(walletsService.depositCash).not.toHaveBeenCalled();
+    });
+
+    it('should refund cash wallet on failed withdrawal webhook', async () => {
+      const mockTx = {
+        idInternal: 'tx-wd-789',
+        userId: 'user-123',
+        amount: 8000,
+        type: PawaPayTxType.RETRAIT,
+        status: PawaPayTxStatus.EN_COURS,
+      };
+
+      prismaService.pawaPayTransaction.findUnique.mockResolvedValue(mockTx);
+
+      const payload = {
+        payoutId: 'tx-wd-789',
+        status: 'FAILED',
+        amount: 8000,
+      };
+
+      await service.handleWebhook(payload);
+
+      expect(prismaService.pawaPayTransaction.update).toHaveBeenCalledWith({
+        where: { idInternal: 'tx-wd-789' },
+        data: { idPawaPay: 'tx-wd-789', status: PawaPayTxStatus.ECHEC },
+      });
+      expect(walletsService.depositCash).toHaveBeenCalledWith('user-123', 8000);
     });
   });
 });

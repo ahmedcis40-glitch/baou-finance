@@ -275,12 +275,14 @@ export class PawaPayService {
       where: { idInternal },
       data: { idPawaPay, status: finalStatus },
     });
-
     if (isSuccess) {
       if (transaction.type === PawaPayTxType.DEPOT) {
         await this.walletsService.depositCash(transaction.userId, amount || transaction.amount);
-      } else if (transaction.type === PawaPayTxType.RETRAIT) {
-        await this.walletsService.withdrawCash(transaction.userId, transaction.amount);
+      }
+    } else {
+      if (transaction.type === PawaPayTxType.RETRAIT) {
+        // Recréditer le solde cash si la transaction de retrait a échoué (débité à l'initiation)
+        await this.walletsService.depositCash(transaction.userId, transaction.amount);
       }
     }
 
@@ -328,6 +330,9 @@ export class PawaPayService {
         status: PawaPayTxStatus.EN_COURS,
       },
     });
+
+    // Débiter immédiatement le solde cash de l'utilisateur pour éviter les retraits concurrents (Article 54)
+    await this.walletsService.withdrawCash(userId, amount);
 
     await this.prisma.auditLog.create({
       data: {

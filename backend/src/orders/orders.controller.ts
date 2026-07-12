@@ -28,7 +28,7 @@ export class OrdersController {
   }
 
   @UseGuards(RolesGuard)
-  @Roles(Role.TRADER, Role.CLIENT)
+  @Roles(Role.TRADER)
   @Post('admin/status/:id')
   async updateStatus(
     @Param('id') orderId: string,
