@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api } from './services/api';
 import { 
   ShieldCheck, 
@@ -39,6 +39,30 @@ export default function App() {
   const [pawaPayLogs, setPawaPayLogs] = useState([]);
   const [pawaPayTestResult, setPawaPayTestResult] = useState(null);
   const [testingConnection, setTestingConnection] = useState(false);
+
+  // Notifications et alertes d'ordres en temps réel
+  const [newOrderAlert, setNewOrderAlert] = useState(null);
+  const [previousOrdersCount, setPreviousOrdersCount] = useState(0);
+  const previousOrdersCountRef = useRef(0);
+
+  // Modal d'inscription de nouveaux clients par l'admin
+  const [showAddClientModal, setShowAddClientModal] = useState(false);
+  const [newClientFirstName, setNewClientFirstName] = useState('');
+  const [newClientLastName, setNewClientLastName] = useState('');
+  const [newClientEmail, setNewClientEmail] = useState('');
+  const [newClientPhone, setNewClientPhone] = useState('+2250700000000');
+  const [newClientWhatsapp, setNewClientWhatsapp] = useState('+2250700000000');
+  const [newClientPassword, setNewClientPassword] = useState('password123');
+  const [newClientSgi, setNewClientSgi] = useState('Société Générale Capital Securities');
+  const [newClientProfile, setNewClientProfile] = useState('MODERE');
+  const [newClientHorizon, setNewClientHorizon] = useState('MOYEN_TERME');
+  const [newClientObjective, setNewClientObjective] = useState('EPARGNE');
+  const [newClientIdFile, setNewClientIdFile] = useState('cni_recto_verso.pdf');
+  const [newClientPhotoFile, setNewClientPhotoFile] = useState('photo_koffi.jpg');
+  const [newClientAddressFile, setNewClientAddressFile] = useState('facture_cie_avril2026.pdf');
+  const [newClientError, setNewClientError] = useState('');
+  const [newClientSuccess, setNewClientSuccess] = useState(false);
+
   // SGI Data State
   const [clients, setClients] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -85,6 +109,26 @@ export default function App() {
   const [selectedTraderOrder, setSelectedTraderOrder] = useState(null);
   const [traderRealPrice, setTraderRealPrice] = useState('');
 
+  // Notification Sonore Dynamique via Web Audio API (sans fichier externe)
+  const playBeep = () => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.setValueAtTime(880, ctx.currentTime); // A5
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      osc.start();
+      osc.frequency.setValueAtTime(1046.50, ctx.currentTime + 0.12); // C6
+      osc.stop(ctx.currentTime + 0.28);
+    } catch (e) {
+      console.error("Audio Notification Error: ", e);
+    }
+  };
+
   // Fetch SGI Admin Data
   const fetchAdminData = async () => {
     if (!adminToken) return;
@@ -94,6 +138,29 @@ export default function App() {
       setClients(clientsList);
       
       const ordersList = await api.getAllOrders();
+      
+      // Détecter les nouveaux ordres en attente
+      const pendingOrders = ordersList.filter(o => o.status === 'EN_ATTENTE');
+      const currentCount = pendingOrders.length;
+      const prevCount = previousOrdersCountRef.current;
+      
+      if (currentCount > prevCount) {
+        if (prevCount > 0) {
+          const latestOrder = pendingOrders[0];
+          playBeep();
+          setNewOrderAlert({
+            id: latestOrder.id,
+            client: latestOrder.user ? `${latestOrder.user.firstName} ${latestOrder.user.lastName}` : "Client",
+            type: latestOrder.type,
+            stock: latestOrder.codeValeur,
+            qty: latestOrder.quantityRequested,
+            price: latestOrder.priceRequested,
+          });
+          // Masquer l'alerte après 7 secondes
+          setTimeout(() => setNewOrderAlert(null), 7000);
+        }
+      }
+      previousOrdersCountRef.current = currentCount;
       setOrders(ordersList);
 
       const txsList = await api.getAllTransactions();
@@ -364,6 +431,61 @@ export default function App() {
     }
   };
 
+  // Admin Client Creation / Registration
+  const handleAddClientSubmit = async (e) => {
+    e.preventDefault();
+    setNewClientError('');
+    setNewClientSuccess(false);
+
+    try {
+      const kycDocs = {
+        identityCardUrl: `/docs/${newClientIdFile}`,
+        photoUrl: `/docs/${newClientPhotoFile}`,
+        proofOfAddressUrl: `/docs/${newClientAddressFile}`
+      };
+
+      const res = await fetch(`${api.baseUrl || 'http://localhost:3000'}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName: newClientFirstName,
+          lastName: newClientLastName,
+          email: newClientEmail,
+          password: newClientPassword,
+          phone: newClientPhone,
+          whatsappPhone: newClientWhatsapp,
+          consentSMS: true,
+          consentWhatsApp: true,
+          kycDocuments: kycDocs,
+          sgiPartenaire: newClientSgi,
+          investorProfile: newClientProfile,
+          investorHorizon: newClientHorizon,
+          investorObjective: newClientObjective
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Erreur de création de compte client.");
+      }
+
+      setNewClientSuccess(true);
+      setTimeout(() => {
+        setShowAddClientModal(false);
+        setNewClientFirstName('');
+        setNewClientLastName('');
+        setNewClientEmail('');
+        setNewClientPhone('+2250700000000');
+        setNewClientWhatsapp('+2250700000000');
+        setNewClientPassword('password123');
+        setNewClientSuccess(false);
+        fetchAdminData();
+      }, 2000);
+    } catch (err) {
+      setNewClientError(err.message);
+    }
+  };
+
   // Trader Order Action
   const handleTraderOrderAction = async (orderId, status, priceReal = null) => {
     try {
@@ -379,23 +501,60 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#090a0f] text-gray-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-[#08090d] text-gray-100 flex flex-col font-sans relative">
+      {/* Bandeau Drapeau Côte d'Ivoire */}
+      <div className="h-1.5 flex w-full">
+        <div className="flex-1 bg-[#FF8200]"></div>
+        <div className="flex-1 bg-white"></div>
+        <div className="flex-1 bg-[#009E49]"></div>
+      </div>
+
+      {/* Alerte flottante de nouvel ordre */}
+      {newOrderAlert && (
+        <div className="fixed top-6 right-6 z-50 max-w-sm w-full bg-[#0d0e15] border-2 border-[#FF8200] rounded-xl shadow-2xl shadow-orange-500/25 p-4 animate-bounce">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-[#FF8200]/15 text-[#FF8200] rounded-lg">
+              <TrendingUp size={20} className="animate-pulse" />
+            </div>
+            <div className="flex-1">
+              <p className="text-xs font-bold text-[#FF8200] uppercase tracking-wider">🔔 Nouvel Ordre Reçu !</p>
+              <p className="text-sm font-bold text-gray-100 mt-0.5">{newOrderAlert.client}</p>
+              <p className="text-xs text-gray-300 mt-1">
+                Ordre de <span className={newOrderAlert.type === 'ACHAT' ? 'text-[#FF8200] font-bold' : 'text-[#009E49] font-bold'}>{newOrderAlert.type}</span> de <span className="font-bold text-white">{newOrderAlert.qty}</span> actions <span className="font-mono text-white">{newOrderAlert.stock}</span> à {Number(newOrderAlert.price).toLocaleString()} XOF.
+              </p>
+            </div>
+            <button 
+              onClick={() => setNewOrderAlert(null)}
+              className="text-gray-500 hover:text-gray-300 font-bold text-lg"
+            >
+              &times;
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Top Banner */}
-      <header className="border-b border-gray-800 bg-[#0d0e15] px-6 py-4 flex flex-wrap justify-between items-center gap-4">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 flex items-center gap-2">
-            <Coins className="text-indigo-400" /> Plateforme Digitale SGI BRVM
-          </h1>
+      <header className="border-b border-gray-800 bg-[#0c0d14] px-6 py-4 flex flex-wrap justify-between items-center gap-4">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 bg-gradient-to-br from-[#FF8200] to-[#009E49] rounded-xl flex items-center justify-center text-white font-black text-xl border border-white/10 shadow-lg shadow-orange-500/10">
+            B
+          </div>
+          <div>
+            <h1 className="text-xl md:text-2xl font-black tracking-tight flex items-center gap-2">
+              <span className="text-[#FF8200]">BAOU</span> <span className="text-gray-100 font-normal">SGI Portal</span>
+            </h1>
+            <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Négociation de Titres BRVM — Côte d'Ivoire</p>
+          </div>
         </div>
         
         <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 px-3 py-1 bg-green-500/10 border border-green-500/20 rounded-full">
-            <span className="h-2 w-2 bg-green-500 rounded-full animate-pulse"></span>
-            <span className="text-xs text-green-400 font-mono">Backend NestJS: connecté</span>
+          <div className="flex items-center gap-2 px-3 py-1 bg-[#009E49]/10 border border-[#009E49]/20 rounded-full">
+            <span className="h-2 w-2 bg-[#009E49] rounded-full animate-pulse"></span>
+            <span className="text-xs text-[#009E49] font-bold">LBC-FT AMF-UMOA : Conforme</span>
           </div>
           <button 
             onClick={() => { fetchAdminData(); fetchMobileData(); fetchStocks(); }}
-            className="p-2 hover:bg-gray-800 rounded-full transition-colors"
+            className="p-2 hover:bg-gray-800 rounded-full transition-colors text-[#FF8200]"
             title="Rafraîchir les données"
           >
             <RefreshCw size={16} />
@@ -403,19 +562,19 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Container: Centered Single Column (Wider for Trader) */}
+      {/* Main Container: Centered Single Column */}
       <main className="flex-1 p-6 max-w-6xl mx-auto w-full">
         
         {/* Left Side: SGI Admin Portal */}
-        <section className="glass rounded-2xl p-6 flex flex-col border border-gray-800/80">
+        <section className="bg-[#0e0f17]/90 backdrop-blur rounded-2xl p-6 flex flex-col border border-gray-800/80 shadow-2xl">
           <div className="flex items-center justify-between pb-4 border-b border-gray-800 mb-6">
             <div className="flex items-center gap-2">
-              <ShieldCheck className="text-indigo-400" size={24} />
-              <h2 className="text-lg font-bold text-gray-200">Portail SGI (Web Administrateur)</h2>
+              <ShieldCheck className="text-[#FF8200]" size={24} />
+              <h2 className="text-lg font-black text-gray-200">CONSOLE D'ADMINISTRATION BAOU</h2>
             </div>
             {adminUser && (
-              <span className="text-xs bg-indigo-500/20 text-indigo-300 font-semibold px-3 py-1 rounded-full border border-indigo-500/30 uppercase">
-                {adminUser.role === 'ADMIN_KYC' ? 'Agent KYC' : 'Trader BRVM'}
+              <span className="text-xs bg-[#FF8200]/10 text-[#FF8200] font-bold px-3 py-1 rounded-full border border-[#FF8200]/20 uppercase">
+                {adminUser.role === 'ADMIN_KYC' ? 'Agent Conformité KYC' : 'Trader Executeur BRVM'}
               </span>
             )}
           </div>
@@ -424,34 +583,34 @@ export default function App() {
           {!adminToken ? (
             <div className="flex-1 flex flex-col justify-center max-w-md mx-auto w-full py-12">
               <div className="text-center mb-8">
-                <div className="h-12 w-12 bg-indigo-500/10 text-indigo-400 rounded-xl flex items-center justify-center mx-auto mb-4 border border-indigo-500/30">
-                  <Database size={24} />
+                <div className="h-14 w-14 bg-gradient-to-br from-[#FF8200] to-[#009E49] text-white rounded-2xl flex items-center justify-center mx-auto mb-4 border border-white/10 shadow-lg">
+                  <ShieldCheck size={28} />
                 </div>
-                <h3 className="text-lg font-semibold">Connexion Administrative</h3>
-                <p className="text-sm text-gray-400 mt-1">Accès réservé aux agents de la SGI pour la conformité et l'exécution.</p>
+                <h3 className="text-xl font-bold">Connexion Administrative</h3>
+                <p className="text-sm text-gray-400 mt-1">Accès sécurisé pour la conformité LBC/FT et le routage des ordres.</p>
               </div>
 
               <form onSubmit={handleAdminLogin} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Email professionnel</label>
+                  <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Email professionnel</label>
                   <input 
                     type="email"
                     value={adminEmail} 
                     onChange={(e) => setAdminEmail(e.target.value)}
-                    className="w-full bg-[#11121b] border border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-indigo-500"
+                    className="w-full bg-[#13141f] border border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-[#FF8200]"
                     placeholder="admin@sgi.ci"
                     required
                   />
-                  <span className="text-[10px] text-gray-500 mt-1 block">Compte démo par défaut : admin@sgi.ci (password123)</span>
+                  <span className="text-[10px] text-gray-500 mt-1 block">Compte démo : admin@sgi.ci (password123)</span>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-400 uppercase mb-1">Mot de passe</label>
+                  <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Mot de passe</label>
                   <input 
                     type="password" 
                     value={adminPassword} 
                     onChange={(e) => setAdminPassword(e.target.value)}
-                    className="w-full bg-[#11121b] border border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-indigo-500" 
+                    className="w-full bg-[#13141f] border border-gray-800 rounded-lg px-3 py-2 text-sm text-gray-200 focus:outline-none focus:border-[#FF8200]" 
                     placeholder="••••••••"
                     required
                   />
@@ -459,7 +618,7 @@ export default function App() {
 
                 {adminError && <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 p-3 rounded-lg">{adminError}</div>}
 
-                <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-2 rounded-lg transition-colors text-sm">
+                <button type="submit" className="w-full bg-gradient-to-r from-[#FF8200] to-[#009E49] hover:opacity-95 text-white font-bold py-2.5 rounded-lg transition-all text-sm shadow-lg shadow-orange-500/10">
                   Se connecter au portail SGI
                 </button>
               </form>
@@ -468,40 +627,89 @@ export default function App() {
             // SGI Logged In Interface
             <div className="flex-1 flex flex-col">
               {/* Profile Card & Log out */}
-              <div className="bg-[#11121b] p-4 rounded-xl border border-gray-800 flex justify-between items-center mb-6">
+              <div className="bg-[#131420] p-4 rounded-xl border border-gray-800 flex justify-between items-center mb-6">
                 <div>
-                  <p className="text-xs text-gray-400">Agent connecté :</p>
-                  <p className="text-sm font-semibold text-gray-200">{adminUser?.firstName} {adminUser?.lastName}</p>
-                  <p className="text-xs text-gray-400 font-mono mt-0.5">{adminUser?.email}</p>
+                  <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">Agent SGI connecté :</p>
+                  <p className="text-sm font-bold text-gray-200">{adminUser?.firstName} {adminUser?.lastName}</p>
+                  <p className="text-xs text-[#009E49] font-mono mt-0.5">{adminUser?.email}</p>
                 </div>
-                <button onClick={handleAdminLogout} className="text-xs text-red-400 hover:text-red-300 font-medium bg-red-500/10 border border-red-500/20 px-3 py-1.5 rounded-lg transition-colors">
+                <button onClick={handleAdminLogout} className="text-xs text-red-400 hover:text-red-300 font-bold bg-red-500/10 border border-red-500/20 px-3 py-1.5 rounded-lg transition-colors">
                   Déconnexion
                 </button>
+              </div>
+
+              {/* Tableau de bord de statistiques (Côte d'Ivoire thématique) */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div className="bg-[#131420] border border-gray-800 p-4 rounded-xl flex items-center justify-between shadow">
+                  <div>
+                    <p className="text-[9px] text-gray-500 font-black uppercase tracking-wider">Volume Portefeuilles Clients</p>
+                    <p className="text-base font-black text-gray-200 mt-1">
+                      {clients.reduce((acc, c) => acc + (c.cashWallet?.balanceAvailable || 0), 0).toLocaleString()} XOF
+                    </p>
+                  </div>
+                  <div className="h-9 w-9 bg-[#FF8200]/10 text-[#FF8200] rounded-lg flex items-center justify-center">
+                    <Wallet size={18} />
+                  </div>
+                </div>
+
+                <div className="bg-[#131420] border border-gray-800 p-4 rounded-xl flex items-center justify-between shadow">
+                  <div>
+                    <p className="text-[9px] text-gray-500 font-black uppercase tracking-wider">Total Clients BAOU</p>
+                    <p className="text-base font-black text-gray-200 mt-1">{clients.length}</p>
+                  </div>
+                  <div className="h-9 w-9 bg-[#009E49]/10 text-[#009E49] rounded-lg flex items-center justify-center">
+                    <UserCheck size={18} />
+                  </div>
+                </div>
+
+                <div className="bg-[#131420] border border-gray-800 p-4 rounded-xl flex items-center justify-between shadow">
+                  <div>
+                    <p className="text-[9px] text-gray-500 font-black uppercase tracking-wider">Ordres BRVM en Cours</p>
+                    <p className="text-base font-black text-gray-200 mt-1">
+                      {orders.filter(o => o.status === 'EN_ATTENTE' || o.status === 'EN_TRAITEMENT').length}
+                    </p>
+                  </div>
+                  <div className="h-9 w-9 bg-yellow-500/10 text-yellow-400 rounded-lg flex items-center justify-center">
+                    <TrendingUp size={18} />
+                  </div>
+                </div>
+
+                <div className="bg-[#131420] border border-gray-800 p-4 rounded-xl flex items-center justify-between shadow">
+                  <div>
+                    <p className="text-[9px] text-gray-500 font-black uppercase tracking-wider">Taux Conformité KYC</p>
+                    <p className="text-base font-black text-gray-200 mt-1">
+                      {Math.round((clients.filter(c => c.kycStatus === 'APPROUVE').length / (clients.length || 1)) * 100)} %
+                    </p>
+                  </div>
+                  <div className="h-9 w-9 bg-green-500/10 text-green-400 rounded-lg flex items-center justify-center">
+                    <ShieldCheck size={18} />
+                  </div>
+                </div>
               </div>
 
               {/* Navigation Tabs */}
               <div className="flex gap-2 border-b border-gray-800 pb-2 mb-6 overflow-x-auto no-scrollbar">
                 <button 
                   onClick={() => setAdminTab('kyc')} 
-                  className={`text-xs font-semibold px-4 py-2 rounded-lg transition-colors ${adminTab === 'kyc' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'}`}
+                  className={`text-xs font-bold px-4 py-2.5 rounded-lg transition-colors ${adminTab === 'kyc' ? 'bg-[#FF8200] text-white shadow-md' : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'}`}
                 >
                   Validation KYC ({clients.filter(c => c.kycStatus === 'EN_ATTENTE_VALIDATION').length})
                 </button>
                 <button 
                   onClick={() => setAdminTab('trading')} 
-                  className={`text-xs font-semibold px-4 py-2 rounded-lg transition-colors ${adminTab === 'trading' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'}`}
+                  className={`text-xs font-bold px-4 py-2.5 rounded-lg transition-colors ${adminTab === 'trading' ? 'bg-[#FF8200] text-white shadow-md' : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'}`}
                 >
                   Ordres BRVM ({orders.filter(o => o.status === 'EN_ATTENTE' || o.status === 'EN_TRAITEMENT').length})
                 </button>
                 <button 
                   onClick={() => setAdminTab('jeko')} 
-                  className={`text-xs font-semibold px-4 py-2 rounded-lg transition-colors ${adminTab === 'jeko' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'}`}
+                  className={`text-xs font-bold px-4 py-2.5 rounded-lg transition-colors ${adminTab === 'jeko' ? 'bg-[#FF8200] text-white shadow-md' : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'}`}
                 >
                   Flux PawaPay Money
                 </button>
                 <button 
                   onClick={() => setAdminTab('audit')} 
-                  className={`text-xs font-semibold px-4 py-2 rounded-lg transition-colors ${adminTab === 'audit' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'}`}
+                  className={`text-xs font-bold px-4 py-2.5 rounded-lg transition-colors ${adminTab === 'audit' ? 'bg-[#FF8200] text-white shadow-md' : 'text-gray-400 hover:bg-gray-800/50 hover:text-gray-200'}`}
                 >
                   Logs d'Audit
                 </button>
@@ -513,7 +721,15 @@ export default function App() {
                 {/* KYC TAB */}
                 {adminTab === 'kyc' && (
                   <div className="flex-1 overflow-y-auto space-y-4 pr-1">
-                    <h3 className="text-sm font-semibold text-gray-300">Dossiers d'inscription KYC clients</h3>
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-sm font-bold text-gray-300">Dossiers d'inscription KYC clients</h3>
+                      <button
+                        onClick={() => setShowAddClientModal(true)}
+                        className="px-3 py-2 bg-[#009E49] hover:bg-[#008a3f] text-white font-bold text-xs rounded-lg transition-colors flex items-center gap-1 shadow-lg shadow-green-500/10"
+                      >
+                        ➕ Inscrire un Client
+                      </button>
+                    </div>
                     {clients.length === 0 ? (
                       <p className="text-xs text-gray-500 py-8 text-center bg-[#11121b]/40 rounded-xl border border-gray-900">Aucun dossier client trouvé.</p>
                     ) : (
@@ -1497,6 +1713,215 @@ export default function App() {
                 Simuler Réussite (Webhook)
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Inscription Client */}
+      {showAddClientModal && (
+        <div className="fixed inset-0 bg-black/85 flex items-center justify-center p-4 z-50 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-[#0f111a] border border-[#FF8200]/30 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl my-8">
+            <div className="flex justify-between items-center border-b border-gray-800 pb-3">
+              <h3 className="font-bold text-gray-100 flex items-center gap-2">
+                <span className="text-[#FF8200]">➕</span> Inscription d'un nouveau Client (BAOU)
+              </h3>
+              <button 
+                onClick={() => setShowAddClientModal(false)}
+                className="text-gray-500 hover:text-gray-300 font-black text-lg"
+              >
+                &times;
+              </button>
+            </div>
+
+            {newClientSuccess ? (
+              <div className="text-center py-8 space-y-2">
+                <div className="h-12 w-12 bg-green-500/10 text-green-405 rounded-full flex items-center justify-center mx-auto mb-4 border border-green-500/20">
+                  ✓
+                </div>
+                <h4 className="font-bold text-gray-200">Compte créé avec succès !</h4>
+                <p className="text-xs text-gray-400">Le dossier KYC client a été généré et inséré dans le registre.</p>
+              </div>
+            ) : (
+              <form onSubmit={handleAddClientSubmit} className="space-y-4 text-xs">
+                {newClientError && (
+                  <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg">
+                    {newClientError}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] text-gray-400 mb-1 uppercase font-bold">Prénom</label>
+                    <input 
+                      type="text" 
+                      value={newClientFirstName}
+                      onChange={e => setNewClientFirstName(e.target.value)}
+                      className="w-full bg-gray-950 border border-gray-800 rounded p-2 text-gray-200 focus:border-[#FF8200]" 
+                      placeholder="Jean"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-gray-400 mb-1 uppercase font-bold">Nom</label>
+                    <input 
+                      type="text" 
+                      value={newClientLastName}
+                      onChange={e => setNewClientLastName(e.target.value)}
+                      className="w-full bg-gray-950 border border-gray-800 rounded p-2 text-gray-200 focus:border-[#FF8200]" 
+                      placeholder="Koffi"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] text-gray-400 mb-1 uppercase font-bold">Adresse Email</label>
+                  <input 
+                    type="email" 
+                    value={newClientEmail}
+                    onChange={e => setNewClientEmail(e.target.value)}
+                    className="w-full bg-gray-950 border border-gray-800 rounded p-2 text-gray-200 focus:border-[#FF8200]" 
+                    placeholder="jean.koffi@gmail.com"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[9px] text-gray-400 mb-1 uppercase font-bold">Téléphone</label>
+                    <input 
+                      type="tel" 
+                      value={newClientPhone}
+                      onChange={e => setNewClientPhone(e.target.value)}
+                      className="w-full bg-gray-950 border border-gray-800 rounded p-2 text-gray-200" 
+                      placeholder="+22507..."
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] text-gray-400 mb-1 uppercase font-bold">WhatsApp</label>
+                    <input 
+                      type="tel" 
+                      value={newClientWhatsapp}
+                      onChange={e => setNewClientWhatsapp(e.target.value)}
+                      className="w-full bg-gray-950 border border-gray-800 rounded p-2 text-gray-200" 
+                      placeholder="+22507..."
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] text-gray-400 mb-1 uppercase font-bold">Mot de Passe</label>
+                    <input 
+                      type="password" 
+                      value={newClientPassword}
+                      onChange={e => setNewClientPassword(e.target.value)}
+                      className="w-full bg-gray-950 border border-gray-800 rounded p-2 text-gray-200" 
+                      placeholder="••••••••"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[9px] text-gray-400 mb-1 uppercase font-bold">Profil Risque</label>
+                    <select 
+                      value={newClientProfile}
+                      onChange={e => setNewClientProfile(e.target.value)}
+                      className="w-full bg-gray-950 border border-gray-800 rounded p-2 text-gray-200"
+                    >
+                      <option value="PRUDENT">Prudent</option>
+                      <option value="MODERE">Modéré</option>
+                      <option value="DYNAMIQUE">Dynamique</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[9px] text-gray-400 mb-1 uppercase font-bold">Horizon</label>
+                    <select 
+                      value={newClientHorizon}
+                      onChange={e => setNewClientHorizon(e.target.value)}
+                      className="w-full bg-gray-950 border border-gray-800 rounded p-2 text-gray-200"
+                    >
+                      <option value="COURT_TERME">Court Terme</option>
+                      <option value="MOYEN_TERME">Moyen Terme</option>
+                      <option value="LONG_TERME">Long Terme</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[9px] text-gray-400 mb-1 uppercase font-bold">Objectif</label>
+                    <select 
+                      value={newClientObjective}
+                      onChange={e => setNewClientObjective(e.target.value)}
+                      className="w-full bg-gray-950 border border-gray-800 rounded p-2 text-gray-200"
+                    >
+                      <option value="EPARGNE">Épargne</option>
+                      <option value="RENDEMENT">Rendement</option>
+                      <option value="SPECULATION">Spéculation</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] text-gray-400 mb-1 uppercase font-bold">SGI Partenaire</label>
+                  <select 
+                    value={newClientSgi}
+                    onChange={e => setNewClientSgi(e.target.value)}
+                    className="w-full bg-gray-950 border border-gray-800 rounded p-2 text-gray-200"
+                  >
+                    <option value="Société Générale Capital Securities">Société Générale Capital Securities (SGCS)</option>
+                    <option value="Ecobank Investment Corporation">Ecobank Investment Corporation (EIC)</option>
+                    <option value="BOA Capital Securities">BOA Capital Securities</option>
+                  </select>
+                </div>
+
+                {/* Dossier KYC obligatoire */}
+                <div className="bg-gray-950 p-3 rounded-lg border border-gray-850 space-y-2">
+                  <span className="font-bold text-[#FF8200] block uppercase text-[9px]">Justificatifs Réglementaires (Côte d'Ivoire AMF-UMOA)</span>
+                  
+                  <div className="grid grid-cols-2 gap-2 text-[10px]">
+                    <div>
+                      <span className="text-gray-500 block">1. Pièce d'identité (CNI/Passeport) :</span>
+                      <input 
+                        type="text" 
+                        value={newClientIdFile}
+                        onChange={e => setNewClientIdFile(e.target.value)}
+                        className="w-full bg-gray-900 border border-gray-800 rounded p-1.5 text-gray-300 font-mono"
+                        required 
+                      />
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block">2. Facture CIE / SODECI (moins de 3 mois) :</span>
+                      <input 
+                        type="text" 
+                        value={newClientAddressFile}
+                        onChange={e => setNewClientAddressFile(e.target.value)}
+                        className="w-full bg-gray-900 border border-gray-800 rounded p-1.5 text-gray-300 font-mono"
+                        required 
+                      />
+                    </div>
+                  </div>
+                  <div className="text-[9px] text-gray-500 mt-1">
+                    Les fichiers seront enregistrés par défaut sous : <span className="text-gray-400">/docs/{newClientIdFile}</span> et <span className="text-gray-400">/docs/{newClientAddressFile}</span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button 
+                    type="button"
+                    onClick={() => setShowAddClientModal(false)}
+                    className="flex-1 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 font-bold rounded-lg transition-colors"
+                  >
+                    Annuler
+                  </button>
+                  <button 
+                    type="submit"
+                    className="flex-1 py-2 bg-gradient-to-r from-[#FF8200] to-[#009E49] hover:opacity-95 text-white font-bold rounded-lg transition-colors"
+                  >
+                    Créer le compte Client
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
