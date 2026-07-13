@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'services/api_service.dart';
 import 'models/user.dart';
 import 'screens/login_screen.dart';
@@ -10,11 +11,15 @@ import 'screens/history_screen.dart';
 import 'screens/dca_screen.dart';
 import 'screens/account_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final prefs = await SharedPreferences.getInstance();
+  final initialUrl = prefs.getString('api_base_url') ?? ApiService.defaultUrl;
+
   runApp(
     MultiProvider(
       providers: [
-        Provider<ApiService>(create: (_) => ApiService()),
+        Provider<ApiService>(create: (_) => ApiService(initialBaseUrl: initialUrl)),
         ChangeNotifierProvider<AppState>(create: (_) => AppState()),
       ],
       child: const SgiApp(),

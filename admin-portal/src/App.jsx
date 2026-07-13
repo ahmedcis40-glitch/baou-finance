@@ -33,6 +33,12 @@ export default function App() {
   const [adminPassword, setAdminPassword] = useState('password123');
   const [adminTab, setAdminTab] = useState('trading'); // 'kyc' | 'trading' | 'jeko' | 'audit'
   
+  // PawaPay Debugging State
+  const [pawaPaySubTab, setPawaPaySubTab] = useState('history'); // 'history' | 'debug'
+  const [pawaPayDebugInfo, setPawaPayDebugInfo] = useState(null);
+  const [pawaPayLogs, setPawaPayLogs] = useState([]);
+  const [pawaPayTestResult, setPawaPayTestResult] = useState(null);
+  const [testingConnection, setTestingConnection] = useState(false);
   // SGI Data State
   const [clients, setClients] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -95,9 +101,42 @@ export default function App() {
 
       const logsList = await api.getAuditLogs();
       setAuditLogs(logsList);
+
+      // Charger les informations de débogage PawaPay
+      try {
+        const debugInfo = await api.getPawaPayDebugInfo();
+        setPawaPayDebugInfo(debugInfo);
+      } catch (err) {
+        console.error("Erreur de récupération des infos de débogage PawaPay:", err);
+      }
+
+      // Charger les logs d'audit spécifiques à PawaPay
+      try {
+        const debugLogs = await api.getPawaPayDebugLogs();
+        setPawaPayLogs(debugLogs);
+      } catch (err) {
+        console.error("Erreur de récupération des logs PawaPay:", err);
+      }
     } catch (e) {
       console.error("Admin data fetch error:", e);
       setAdminError(e.message);
+    }
+  };
+
+  const handleTestPawaPayConnection = async () => {
+    setTestingConnection(true);
+    setPawaPayTestResult(null);
+    try {
+      api.setToken(adminToken);
+      const res = await api.testPawaPayConnection();
+      setPawaPayTestResult(res);
+      // Rafraîchir les logs après un test de connexion car un log d'audit a pu être écrit
+      const debugLogs = await api.getPawaPayDebugLogs();
+      setPawaPayLogs(debugLogs);
+    } catch (e) {
+      setPawaPayTestResult({ success: false, error: e.message });
+    } finally {
+      setTestingConnection(false);
     }
   };
 
@@ -274,22 +313,32 @@ export default function App() {
       api.setToken(mobileToken);
       const res = await api.initiateDeposit(depositAmount);
       setPendingJekoTxId(res.transactionId);
-      setShowJekoModal(true);
+      if (res.paymentUrl) {
+        window.location.href = res.paymentUrl;
+      } else {
+        setShowJekoModal(true);
+      }
     } catch (err) {
       setMobileError(err.message);
     }
   };
 
-  // Jeko Webhook Simulation
-  const handleSimulatePayment = async (status) => {
+  // PawaPay/Jeko Webhook Simulation
+  const handleSimulatePayment = async (status, txId = null, amount = null) => {
+    const finalTxId = txId || pendingJekoTxId;
+    const finalAmount = amount || depositAmount;
+    if (!finalTxId) return;
+
     try {
       // We simulate payment notification coming to the webhook
-      await api.simulateWebhook(pendingJekoTxId, status, depositAmount);
+      await api.simulateWebhook(finalTxId, status === 'SUCCESS' ? 'COMPLETED' : 'FAILED', finalAmount);
       setShowJekoModal(false);
-      setPendingJekoTxId(null);
+      if (!txId) {
+        setPendingJekoTxId(null);
+      }
       fetchMobileData();
       fetchAdminData();
-      alert(status === 'SUCCESS' ? 'Dépôt réussi via Jèko Mobile Money.' : 'Dépôt échoué ou annulé.');
+      alert(status === 'SUCCESS' ? 'Dépôt réussi via Mobile Money.' : 'Dépôt échoué ou annulé.');
     } catch (err) {
       alert(err.message);
     }
@@ -649,54 +698,228 @@ export default function App() {
 
                 {/* JEKO FLUX TAB */}
                 {adminTab === 'jeko' && (
-                  <div className="flex-1 overflow-y-auto space-y-4 pr-1">
-                    <h3 className="text-sm font-semibold text-gray-300">Journal des webhooks et paiements Jèko</h3>
-                    {transactions.length === 0 ? (
-                      <p className="text-xs text-gray-500 py-8 text-center bg-[#11121b]/40 rounded-xl border border-gray-900">Aucune transaction Mobile Money enregistrée.</p>
-                    ) : (
-                      transactions.map((tx) => (
-                        <div key={tx.idInternal} className="bg-[#11121b] border border-gray-800 p-4 rounded-xl space-y-3 font-mono text-xs">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="text-[10px] text-gray-500 font-bold uppercase">ID Transaction Interne</p>
-                              <p className="text-gray-300 font-semibold">{tx.idInternal}</p>
+                  <div className="flex-1 flex flex-col min-h-0">
+                    {/* Sub-tabs Navigation */}
+                    <div className="flex gap-4 border-b border-gray-800 pb-2 mb-4">
+                      <button
+                        onClick={() => setPawaPaySubTab('history')}
+                        className={`text-xs font-bold pb-1.5 transition-colors border-b-2 ${
+                          pawaPaySubTab === 'history' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-gray-400 hover:text-gray-200'
+                        }`}
+                      >
+                        📋 Historique des transactions
+                      </button>
+                      <button
+                        onClick={() => setPawaPaySubTab('debug')}
+                        className={`text-xs font-bold pb-1.5 transition-colors border-b-2 ${
+                          pawaPaySubTab === 'debug' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-gray-400 hover:text-gray-200'
+                        }`}
+                      >
+                        🛠️ Console de débogage & Webhooks
+                      </button>
+                    </div>
+
+                    {/* HISTORY SUB-TAB */}
+                    {pawaPaySubTab === 'history' && (
+                      <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+                        <h3 className="text-sm font-semibold text-gray-300">Journal des webhooks et paiements PawaPay</h3>
+                        {transactions.length === 0 ? (
+                          <p className="text-xs text-gray-500 py-8 text-center bg-[#11121b]/40 rounded-xl border border-gray-900">Aucune transaction Mobile Money enregistrée.</p>
+                        ) : (
+                          transactions.map((tx) => (
+                            <div key={tx.idInternal} className="bg-[#11121b] border border-gray-800 p-4 rounded-xl space-y-3 font-mono text-xs">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <p className="text-[10px] text-gray-500 font-bold uppercase">ID Transaction Interne</p>
+                                  <p className="text-gray-300 font-semibold">{tx.idInternal}</p>
+                                </div>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                  tx.status === 'SUCCES' ? 'bg-green-500/10 text-green-400 border-green-500/20' : 
+                                  tx.status === 'ECHEC' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 
+                                  'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+                                }`}>
+                                  {tx.status}
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-2 gap-2 text-[11px] border-t border-gray-800/80 pt-2.5">
+                                <div>
+                                  <span className="text-gray-500">ID PawaPay :</span>
+                                  <p className="text-gray-300 truncate">{tx.idPawaPay || 'N/A (En attente)'}</p>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500">Montant :</span>
+                                  <p className="text-gray-300 font-bold">{tx.amount.toLocaleString()} XOF</p>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500">Flux :</span>
+                                  <p className="text-indigo-400 font-bold">{tx.type}</p>
+                                </div>
+                                <div>
+                                  <span className="text-gray-500">Client ID :</span>
+                                  <p className="text-gray-300 truncate">{tx.user?.firstName} {tx.user?.lastName}</p>
+                                </div>
+                              </div>
+
+                              {tx.webhookSignature && (
+                                <div className="bg-gray-950 p-2 rounded border border-gray-850">
+                                  <span className="text-[9px] text-green-500 font-bold block mb-0.5">Webhook Validé Cryptographiquement</span>
+                                  <p className="text-[9px] text-gray-500 break-all leading-tight">{tx.webhookSignature}</p>
+                                </div>
+                              )}
                             </div>
-                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                              tx.status === 'SUCCES' ? 'bg-green-500/10 text-green-400 border-green-500/20' : 
-                              tx.status === 'ECHEC' ? 'bg-red-500/10 text-red-400 border-red-500/20' : 
-                              'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+                          ))
+                        )}
+                      </div>
+                    )}
+
+                    {/* DEBUG SUB-TAB */}
+                    {pawaPaySubTab === 'debug' && (
+                      <div className="flex-1 overflow-y-auto space-y-5 pr-1 text-xs">
+                        
+                        {/* 1. ÉTAT DE LA CONFIGURATION */}
+                        <div className="bg-[#11121b] border border-gray-800 p-4 rounded-xl space-y-3">
+                          <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wider">État de la Configuration Backend</h4>
+                          
+                          {pawaPayDebugInfo ? (
+                            <div className="space-y-2 text-xs font-mono">
+                              <div className="flex justify-between border-b border-gray-900 pb-1.5">
+                                <span className="text-gray-500">Environnement :</span>
+                                <span className="text-gray-300 font-bold uppercase">{pawaPayDebugInfo.environment}</span>
+                              </div>
+                              <div className="flex justify-between border-b border-gray-900 pb-1.5">
+                                <span className="text-gray-500">PawaPay API URL :</span>
+                                <span className="text-gray-300 truncate max-w-[280px]">{pawaPayDebugInfo.apiUrl}</span>
+                              </div>
+                              <div className="flex justify-between border-b border-gray-900 pb-1.5">
+                                <span className="text-gray-500">Clé API (Token) :</span>
+                                <span className={`font-semibold ${pawaPayDebugInfo.apiKeyConfigured ? 'text-green-400' : 'text-red-400'}`}>
+                                  {pawaPayDebugInfo.apiKeyConfigured ? `Active (${pawaPayDebugInfo.apiKeyMasked})` : '⚠️ Non configurée'}
+                                </span>
+                              </div>
+                              <div className="flex justify-between pb-1">
+                                <span className="text-gray-500">Secret Webhook :</span>
+                                <span className={`font-semibold ${pawaPayDebugInfo.webhookSecretConfigured ? 'text-green-400' : 'text-yellow-400'}`}>
+                                  {pawaPayDebugInfo.webhookSecretConfigured ? 'Configuré' : 'Par défaut (Local / Dev)'}
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-gray-500 italic">Chargement des données de configuration...</p>
+                          )}
+                        </div>
+
+                        {/* 2. TEST DE CONNEXION */}
+                        <div className="bg-[#11121b] border border-gray-800 p-4 rounded-xl space-y-4">
+                          <div className="flex justify-between items-center">
+                            <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wider">Test de Connexion API</h4>
+                            <button
+                              onClick={handleTestPawaPayConnection}
+                              disabled={testingConnection}
+                              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-gray-800 text-white font-semibold text-[11px] rounded-lg transition-colors"
+                            >
+                              {testingConnection ? 'Connexion en cours...' : 'Tester la connexion'}
+                            </button>
+                          </div>
+
+                          {pawaPayTestResult && (
+                            <div className={`p-3 rounded-lg border text-xs ${
+                              pawaPayTestResult.success 
+                                ? 'bg-green-500/5 border-green-500/20 text-green-400' 
+                                : 'bg-red-500/5 border-red-500/20 text-red-400'
                             }`}>
-                              {tx.status}
-                            </span>
-                          </div>
+                              <p className="font-bold flex items-center gap-1.5 mb-2">
+                                <span className={`w-2 h-2 rounded-full ${pawaPayTestResult.success ? 'bg-green-400' : 'bg-red-400'}`}></span>
+                                {pawaPayTestResult.message || "Échec du test de connexion"}
+                              </p>
+                              
+                              {pawaPayTestResult.error && (
+                                <p className="font-mono text-[10px] bg-black/40 p-2 rounded border border-red-500/10 text-red-300 whitespace-pre-wrap">
+                                  {pawaPayTestResult.error}
+                                </p>
+                              )}
 
-                          <div className="grid grid-cols-2 gap-2 text-[11px] border-t border-gray-800/80 pt-2.5">
-                            <div>
-                              <span className="text-gray-500">ID Jèko :</span>
-                              <p className="text-gray-300 truncate">{tx.idJeko || 'N/A (En attente)'}</p>
-                            </div>
-                            <div>
-                              <span className="text-gray-500">Montant :</span>
-                              <p className="text-gray-300 font-bold">{tx.amount.toLocaleString()} XOF</p>
-                            </div>
-                            <div>
-                              <span className="text-gray-500">Flux :</span>
-                              <p className="text-indigo-400 font-bold">{tx.type}</p>
-                            </div>
-                            <div>
-                              <span className="text-gray-500">Client ID :</span>
-                              <p className="text-gray-300 truncate">{tx.user?.firstName} {tx.user?.lastName}</p>
-                            </div>
-                          </div>
-
-                          {tx.webhookSignature && (
-                            <div className="bg-gray-950 p-2 rounded border border-gray-850">
-                              <span className="text-[9px] text-green-500 font-bold block mb-0.5">Webhook Validé Cryptographiquement</span>
-                              <p className="text-[9px] text-gray-500 break-all leading-tight">{tx.webhookSignature}</p>
+                              {pawaPayTestResult.success && pawaPayTestResult.data && (
+                                <div className="space-y-1.5 mt-2">
+                                  <p className="text-[10px] text-gray-400 uppercase font-bold">Configurations PawaPay Actives :</p>
+                                  <pre className="p-2 bg-black/40 rounded border border-green-500/10 text-[10px] text-gray-300 font-mono max-h-[160px] overflow-y-auto no-scrollbar">
+                                    {JSON.stringify(pawaPayTestResult.data, null, 2)}
+                                  </pre>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
-                      ))
+
+                        {/* 3. SIMULATEUR DE WEBHOOKS DIRECT */}
+                        <div className="bg-[#11121b] border border-gray-800 p-4 rounded-xl space-y-3">
+                          <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wider">Simulateur Manuel de Webhooks (Dev)</h4>
+                          <p className="text-[11px] text-gray-500">Déclenchez directement un webhook de retour de paiement (Succès ou Échec) pour les transactions de dépôt en attente.</p>
+                          
+                          {transactions.filter(t => t.status === 'EN_COURS' && t.type === 'DEPOT').length === 0 ? (
+                            <p className="text-xs text-gray-500 py-3 text-center bg-gray-950/40 rounded border border-gray-900">Aucun dépôt en attente de validation.</p>
+                          ) : (
+                            <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1 no-scrollbar">
+                              {transactions.filter(t => t.status === 'EN_COURS' && t.type === 'DEPOT').map((tx) => (
+                                <div key={tx.idInternal} className="bg-gray-950/60 p-2.5 rounded border border-gray-900 flex justify-between items-center gap-2">
+                                  <div className="font-mono text-[10px]">
+                                    <p className="text-gray-300 font-semibold">{tx.amount.toLocaleString()} XOF</p>
+                                    <p className="text-gray-500 truncate max-w-[150px]">{tx.idInternal}</p>
+                                  </div>
+                                  <div className="flex gap-1.5">
+                                    <button
+                                      onClick={() => handleSimulatePayment('FAILED', tx.idInternal, tx.amount)}
+                                      className="px-2 py-1 bg-red-950 text-red-400 hover:bg-red-900 border border-red-900/30 rounded text-[9px] font-bold transition-colors"
+                                    >
+                                      Échec
+                                    </button>
+                                    <button
+                                      onClick={() => handleSimulatePayment('SUCCESS', tx.idInternal, tx.amount)}
+                                      className="px-2 py-1 bg-green-950 text-green-400 hover:bg-green-900 border border-green-900/30 rounded text-[9px] font-bold transition-colors"
+                                    >
+                                      Succès
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 4. LOGS DE DÉBOGAGE PAWAPAY (Logs d'Audit de Paiement) */}
+                        <div className="bg-[#11121b] border border-gray-800 p-4 rounded-xl space-y-3">
+                          <h4 className="text-xs font-bold text-indigo-400 uppercase tracking-wider">Historique des Logs de Débogage PawaPay</h4>
+                          
+                          {pawaPayLogs.length === 0 ? (
+                            <p className="text-xs text-gray-500 py-4 text-center bg-gray-950/40 rounded border border-gray-900">Aucun log de paiement disponible.</p>
+                          ) : (
+                            <div className="space-y-2 max-h-[250px] overflow-y-auto pr-1 no-scrollbar font-mono text-[10px]">
+                              {pawaPayLogs.map((log) => (
+                                <div key={log.id} className="bg-gray-950 p-2.5 rounded border border-gray-900 space-y-1">
+                                  <div className="flex justify-between text-[9px] text-gray-500">
+                                    <span>{new Date(log.createdAt).toLocaleString()}</span>
+                                    <span>IP: {log.ipAddress}</span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className={`font-bold px-1.5 py-0.5 rounded text-[9px] ${
+                                      log.action.includes('SUCCESS') ? 'bg-green-500/10 text-green-400' :
+                                      log.action.includes('FAILED') ? 'bg-red-500/10 text-red-400' :
+                                      'bg-indigo-500/10 text-indigo-400'
+                                    }`}>
+                                      {log.action}
+                                    </span>
+                                    <span className="text-gray-400">{log.user?.email || 'Système'}</span>
+                                  </div>
+                                  <pre className="p-1.5 bg-black/40 rounded border border-gray-850 text-[9px] text-gray-500 overflow-x-auto max-h-[80px] no-scrollbar">
+                                    {JSON.stringify(JSON.parse(log.details), null, 2)}
+                                  </pre>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                      </div>
                     )}
                   </div>
                 )}

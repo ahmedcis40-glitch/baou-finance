@@ -38,7 +38,7 @@ export class PawaPayController {
     await this.pawaPayService.handleReturn(depositId);
     // Redirect user back to the client app
     const clientUrl = process.env.CLIENT_APP_URL || 'http://localhost:5173';
-    res.redirect(`${clientUrl}/#/wallet?payment=success&id=${depositId}`);
+    res.redirect(`${clientUrl}?payment=success&id=${depositId}`);
   }
 
   // ── Client: Get my transactions
@@ -88,5 +88,29 @@ export class PawaPayController {
       created: new Date().toISOString(),
     };
     return this.pawaPayService.handleWebhook(payload);
+  }
+
+  // ── Admin: Get PawaPay debug config info
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(Role.ADMIN_KYC, Role.TRADER)
+  @Get('debug-info')
+  async getDebugInfo() {
+    return this.pawaPayService.getDebugInfo();
+  }
+
+  // ── Admin: Test PawaPay connection
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(Role.ADMIN_KYC, Role.TRADER)
+  @Post('test-connection')
+  async testConnection() {
+    return this.pawaPayService.testConnection();
+  }
+
+  // ── Admin: Get PawaPay transaction audit logs
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles(Role.ADMIN_KYC, Role.TRADER)
+  @Get('debug-logs')
+  async getPawaPayLogs() {
+    return this.pawaPayService.getPawaPayLogs();
   }
 }

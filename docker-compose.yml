@@ -15,6 +15,11 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   # 2. Backend API (NestJS)
   backend:
@@ -31,7 +36,9 @@ services:
       - JWT_SECRET=superSecretJwtTokenKeyForBaou2026
       # Mettre ici les clés pour d'autres passerelles (ex: PawaPay) si nécessaire
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    command: sh -c "npx prisma migrate deploy && npx prisma db seed && node dist/main"
 
   # 3. Portail Client Web (React/Vite)
   client-portal:

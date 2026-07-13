@@ -143,6 +143,47 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  void _showServerSettings() {
+    final api = context.read<ApiService>();
+    final controller = TextEditingController(text: api.baseUrl);
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Configuration du Serveur'),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(
+              labelText: 'URL API Backend',
+              hintText: 'https://finance-baou-xyz.loca.lt',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final url = controller.text.trim();
+                if (url.isNotEmpty) {
+                  await api.updateBaseUrl(url);
+                  if (mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Serveur configuré : $url')),
+                    );
+                  }
+                }
+              },
+              child: const Text('Enregistrer'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
@@ -433,6 +474,16 @@ class _LoginScreenState extends State<LoginScreen> {
                       ? 'Vous avez déjà un compte ? Se connecter' 
                       : 'Créer un Compte-Titres Réglementaire (KYC)',
                   style: const TextStyle(color: Color(0xFF009E49), fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 12),
+              Center(
+                child: TextButton.icon(
+                  onPressed: _showServerSettings,
+                  icon: const Icon(Icons.settings, size: 16, color: Colors.grey),
+                  label: const Text(
+                    'Configuration Serveur',
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
                 ),
               ),
             ],

@@ -159,6 +159,22 @@ export default function App() {
     fetchStocks();
   }, []);
 
+  // Détecter le retour de paiement PawaPay et rafraîchir les données
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const payment = params.get('payment');
+    const depositId = params.get('id');
+    if (payment === 'success' && depositId) {
+      alert(`Dépôt reçu ! Votre transaction de rechargement (ID: ${depositId}) a été transmise. Votre solde de portefeuille sera mis à jour dès confirmation.`);
+      // Nettoyer les paramètres de l'URL pour ne pas réafficher l'alerte au rafraîchissement
+      window.history.replaceState({}, document.title, window.location.pathname);
+      if (token) {
+        fetchProfile();
+        fetchMobileData();
+      }
+    }
+  }, [token]);
+
   // WhatsApp Alert Generator for Mobile
   useEffect(() => {
     if (!user) {
@@ -411,7 +427,11 @@ export default function App() {
       }
       const result = await res.json();
       setPendingTxId(result.transactionId);
-      setShowPawaPayModal(true);
+      if (result.paymentUrl) {
+        window.location.href = result.paymentUrl;
+      } else {
+        setShowPawaPayModal(true);
+      }
     } catch (err) {
       alert(err.message);
     }

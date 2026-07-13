@@ -141,6 +141,20 @@ class ApiService {
     });
   }
 
+  async getPawaPayDebugInfo() {
+    return this.request('/pawapay/debug-info');
+  }
+
+  async testPawaPayConnection() {
+    return this.request('/pawapay/test-connection', {
+      method: 'POST',
+    });
+  }
+
+  async getPawaPayDebugLogs() {
+    return this.request('/pawapay/debug-logs');
+  }
+
   // Market stock tickers
   async getStocks() {
     return this.request('/market/stocks');

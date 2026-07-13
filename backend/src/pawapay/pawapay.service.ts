@@ -20,13 +20,16 @@ export class PawaPayService {
   ) {}
 
   private getBaseUrl(): string {
+    if (process.env.PAWAPAY_API_URL) {
+      return process.env.PAWAPAY_API_URL;
+    }
     return process.env.PAWAPAY_ENVIRONMENT === 'production'
       ? PAWAPAY_PROD_BASE
       : PAWAPAY_SANDBOX_BASE;
   }
 
   private getApiToken(): string | null {
-    const token = process.env.PAWAPAY_API_TOKEN;
+    const token = process.env.PAWAPAY_API_TOKEN || process.env.PAWAPAY_API_KEY;
     if (!token || token === 'placeholder' || token.trim() === '') return null;
     return token;
   }
@@ -82,52 +85,100 @@ export class PawaPayService {
 
     const apiToken = this.getApiToken();
     if (apiToken) {
-      // Try PawaPay Hosted Checkout (widget/sessions) first
-      const widgetUrl = `${this.getBaseUrl()}/v1/widget/sessions`;
+      const baseUrl = this.getBaseUrl();
+      const isV2 = baseUrl.includes('/v2');
+      const widgetUrl = isV2 
+        ? `${baseUrl}/paymentpage` 
+        : `${baseUrl}/v1/widget/sessions`;
       const returnUrl = process.env.PAWAPAY_RETURN_URL || 'https://baoufinance-api.loca.lt/pawapay/return';
 
+      const userPhone = phone || user.phone || '2250700000000';
+      const cleanPhone = userPhone.replace(/[\s\+]/g, '');
+      const { country, correspondent } = this.detectCorrespondent(cleanPhone);
+
+      const bodyPayload = isV2 ? {
+        depositId: transaction.idInternal,
+        returnUrl: returnUrl,
+        amountDetails: {
+          amount: amount.toFixed(2),
+          currency: 'XOF',
+        },
+        phoneNumber: cleanPhone,
+        language: 'FR',
+        country: country === 'GHA' ? 'GHA' : 'CIV',
+        reason: 'Dépôt BAOU Finance',
+      } : {
+        depositId: transaction.idInternal,
+        amount: amount.toFixed(2),
+        currency: 'XOF',
+        returnUrl: returnUrl,
+        webhookUrl: process.env.PAWAPAY_WEBHOOK_URL || 'https://baoufinance-api.loca.lt/pawapay/webhook',
+        reason: 'Dépôt BAOU Finance',
+      };
+
       try {
-        this.logger.log(`[PawaPay] Initiating deposit ${transaction.idInternal} - amount: ${amount} XOF`);
+        this.logger.log(`[PawaPay] Initiating deposit ${transaction.idInternal} via ${isV2 ? 'v2/paymentpage' : 'v1/widget/sessions'} - amount: ${amount} XOF`);
         const response = await fetch(widgetUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${apiToken}`,
           },
-          body: JSON.stringify({
-            depositId: transaction.idInternal,
-            amount: amount.toFixed(2),
-            currency: 'XOF',
-            returnUrl: returnUrl,
-            webhookUrl: process.env.PAWAPAY_WEBHOOK_URL || 'https://baoufinance-api.loca.lt/pawapay/webhook',
-            reason: 'Dépôt BAOU Finance',
-          }),
+          body: JSON.stringify(bodyPayload),
         });
 
         const responseText = await response.text();
-        this.logger.log(`[PawaPay] Widget session response: ${response.status} ${responseText}`);
+        this.logger.log(`[PawaPay] Session response: ${response.status} ${responseText}`);
 
         if (response.ok) {
           const data = JSON.parse(responseText);
-          if (data && data.redirectUrl) {
+          const redirectUrl = data && (data.redirectUrl || data.paymentUrl);
+          if (redirectUrl) {
             return {
               message: "Dépôt initié via PawaPay Hosted Checkout.",
               transactionId: transaction.idInternal,
-              paymentUrl: data.redirectUrl,
+              paymentUrl: redirectUrl,
               mode: 'pawapay_live',
             };
           }
         }
-        this.logger.warn(`[PawaPay] Widget session failed, trying direct deposit API...`);
+        this.logger.warn(`[PawaPay] Session failed, trying direct deposit API...`);
       } catch (error) {
-        this.logger.error(`[PawaPay] Widget session error: ${error.message}`);
+        this.logger.error(`[PawaPay] Session error: ${error.message}`);
       }
 
       // Fallback: Try direct deposit API
-      const depositUrl = `${this.getBaseUrl()}/deposits`;
-      const phoneNumber = phone || user.phone;
-      const { correspondent, country } = this.detectCorrespondent(phoneNumber || '2250700000000');
-      const cleanPhone = (phoneNumber || '2250700000000').replace(/[\s\+]/g, '');
+      const depositUrl = isV2 
+        ? `${baseUrl}/deposits` 
+        : `${baseUrl}/v1/deposits`;
+
+      const directBody = isV2 ? {
+        depositId: transaction.idInternal,
+        amountDetails: {
+          amount: amount.toFixed(2),
+          currency: 'XOF',
+        },
+        country: country === 'GHA' ? 'GHA' : 'CIV',
+        correspondent,
+        payer: {
+          type: 'MSISDN',
+          address: { value: cleanPhone },
+        },
+        customerTimestamp: new Date().toISOString(),
+        statementDescription: 'Depot BAOU Finance',
+      } : {
+        depositId: transaction.idInternal,
+        amount: amount.toFixed(2),
+        currency: 'XOF',
+        country,
+        correspondent,
+        payer: {
+          type: 'MSISDN',
+          address: { value: cleanPhone },
+        },
+        customerTimestamp: new Date().toISOString(),
+        statementDescription: 'Depot BAOU Finance',
+      };
 
       try {
         const response = await fetch(depositUrl, {
@@ -136,19 +187,7 @@ export class PawaPayService {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${apiToken}`,
           },
-          body: JSON.stringify({
-            depositId: transaction.idInternal,
-            amount: amount.toFixed(2),
-            currency: 'XOF',
-            country,
-            correspondent,
-            payer: {
-              type: 'MSISDN',
-              address: { value: cleanPhone },
-            },
-            customerTimestamp: new Date().toISOString(),
-            statementDescription: 'Depot BAOU Finance',
-          }),
+          body: JSON.stringify(directBody),
         });
 
         const responseText = await response.text();
@@ -424,6 +463,91 @@ export class PawaPayService {
         },
       },
       orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async getDebugInfo() {
+    const apiToken = this.getApiToken();
+    const webhookSecret = process.env.PAWAPAY_WEBHOOK_SECRET;
+
+    return {
+      apiUrl: this.getBaseUrl(),
+      apiKeyConfigured: !!apiToken,
+      apiKeyMasked: apiToken 
+        ? `${apiToken.substring(0, 10)}...${apiToken.substring(apiToken.length - 10)}` 
+        : 'Non configurée',
+      webhookSecretConfigured: !!webhookSecret,
+      webhookSecretMasked: webhookSecret
+        ? `${webhookSecret.substring(0, 5)}...`
+        : 'Non configuré (utilise la clé de dev locale par défaut)',
+      environment: process.env.PAWAPAY_ENVIRONMENT || 'sandbox',
+    };
+  }
+
+  async testConnection() {
+    const apiToken = this.getApiToken();
+    if (!apiToken) {
+      return { success: false, error: "Clé API non configurée." };
+    }
+    const baseUrl = this.getBaseUrl();
+    const isV2 = baseUrl.includes('/v2');
+    const endpoint = isV2 
+      ? `${baseUrl}/active-configuration` 
+      : `${baseUrl}/v1/active-configuration`; // fallback
+
+    try {
+      this.logger.log(`[PawaPay Debug] Testing connection to ${endpoint}`);
+      const response = await fetch(endpoint, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${apiToken}`
+        }
+      });
+      const responseText = await response.text();
+      if (response.ok) {
+        let data = {};
+        try {
+          data = JSON.parse(responseText);
+        } catch(e) {
+          data = { response: responseText };
+        }
+        return {
+          success: true,
+          message: "Connexion réussie avec PawaPay !",
+          status: response.status,
+          data
+        };
+      } else {
+        return {
+          success: false,
+          status: response.status,
+          error: `Erreur HTTP ${response.status}: ${responseText}`
+        };
+      }
+    } catch (e) {
+      return {
+        success: false,
+        error: `Erreur réseau : ${e.message}`
+      };
+    }
+  }
+
+  async getPawaPayLogs() {
+    return this.prisma.auditLog.findMany({
+      where: {
+        OR: [
+          { action: { startsWith: 'DEPOSIT_' } },
+          { action: { startsWith: 'WITHDRAW_' } },
+          { action: { contains: 'PAWAPAY' } }
+        ]
+      },
+      include: {
+        user: {
+          select: { email: true, firstName: true, lastName: true, role: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
     });
   }
 }

@@ -6,8 +6,17 @@ import '../models/wallet.dart';
 import '../models/order.dart';
 
 class ApiService {
-  static const String baseUrl = 'https://reassure-bladder-overuse.ngrok-free.dev';
+  static const String defaultUrl = 'https://reassure-bladder-overuse.ngrok-free.dev';
+  String baseUrl;
   String? _token;
+
+  ApiService({String? initialBaseUrl}) : baseUrl = initialBaseUrl ?? defaultUrl;
+
+  Future<void> updateBaseUrl(String url) async {
+    baseUrl = url;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('api_base_url', url);
+  }
 
   Future<String?> _getToken() async {
     if (_token != null) return _token;

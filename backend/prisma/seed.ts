@@ -28,6 +28,13 @@ if (dbUrl.startsWith('postgresql://') || dbUrl.startsWith('postgres://')) {
 async function main() {
   console.log(`Starting database seeding with URL: ${dbUrl}...`);
 
+  // Vérifier si des utilisateurs existent déjà pour ne pas écraser les données au redémarrage
+  const userCount = await prisma.user.count();
+  if (userCount > 0) {
+    console.log('Database already contains data. Skipping seed.');
+    return;
+  }
+
   // Clean existing database records
   await prisma.auditLog.deleteMany({});
   await prisma.pawaPayTransaction.deleteMany({});
