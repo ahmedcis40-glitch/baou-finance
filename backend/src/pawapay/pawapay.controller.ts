@@ -19,9 +19,10 @@ export class PawaPayController {
   async initiateDeposit(
     @Body('amount') amount: number,
     @Body('phone') phone: string,
+    @Body('returnUrl') returnUrl: string,
     @Request() req: any,
   ) {
-    return this.pawaPayService.initiateDeposit(req.user.id, amount, phone);
+    return this.pawaPayService.initiateDeposit(req.user.id, amount, phone, returnUrl);
   }
 
   // ── Client: Initiate withdrawal (PawaPay Payout API)
@@ -83,7 +84,7 @@ export class PawaPayController {
       depositId: idInternal,
       payoutId: undefined,
       status: status || 'COMPLETED',
-      amount: Number(amount),
+      amount: (amount !== undefined && amount !== null && !isNaN(Number(amount))) ? Number(amount) : undefined,
       currency: 'XOF',
       created: new Date().toISOString(),
     };

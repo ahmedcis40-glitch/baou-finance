@@ -165,13 +165,28 @@ export default function App() {
     const payment = params.get('payment');
     const depositId = params.get('id');
     if (payment === 'success' && depositId) {
-      alert(`Dépôt reçu ! Votre transaction de rechargement (ID: ${depositId}) a été transmise. Votre solde de portefeuille sera mis à jour dès confirmation.`);
+      // Pour la simulation de dev: auto-valider immédiatement le paiement (webhook) au retour
+      fetch(`${API_BASE}/pawapay/simulate-webhook`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idInternal: depositId, status: 'SUCCESS' })
+      })
+      .then(() => {
+        alert(`Dépôt validé ! Votre transaction (ID: ${depositId}) a été complétée avec succès et votre portefeuille a été crédité.`);
+        setMobileScreen('wallet');
+        if (token) {
+          fetchProfile();
+          fetchMobileData();
+        }
+      })
+      .catch(err => {
+        console.error("Auto-validation error:", err);
+        alert(`Dépôt reçu ! Votre transaction (ID: ${depositId}) a été enregistrée.`);
+        setMobileScreen('wallet');
+      });
+
       // Nettoyer les paramètres de l'URL pour ne pas réafficher l'alerte au rafraîchissement
       window.history.replaceState({}, document.title, window.location.pathname);
-      if (token) {
-        fetchProfile();
-        fetchMobileData();
-      }
     }
   }, [token]);
 
@@ -419,7 +434,10 @@ export default function App() {
       const res = await fetch(`${API_BASE}/pawapay/${endpoint}`, {
         method: 'POST',
         headers: getHeaders(),
-        body: JSON.stringify({ amount })
+        body: JSON.stringify({ 
+          amount,
+          returnUrl: `${window.location.origin}${window.location.pathname}?payment=success`
+        })
       });
       if (!res.ok) {
         const err = await res.json();

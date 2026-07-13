@@ -52,7 +52,7 @@ export class PawaPayService {
     return { correspondent: 'MTN_MOMO_GHA', country: 'GHA' };
   }
 
-  async initiateDeposit(userId: string, amount: number, phone?: string) {
+  async initiateDeposit(userId: string, amount: number, phone?: string, customReturnUrl?: string) {
     if (amount <= 0) {
       throw new BadRequestException("Le montant doit être supérieur à zéro.");
     }
@@ -90,7 +90,7 @@ export class PawaPayService {
       const widgetUrl = isV2 
         ? `${baseUrl}/paymentpage` 
         : `${baseUrl}/v1/widget/sessions`;
-      const returnUrl = process.env.PAWAPAY_RETURN_URL || 'https://baoufinance-api.loca.lt/pawapay/return';
+      const returnUrl = customReturnUrl || process.env.PAWAPAY_RETURN_URL || 'https://baoufinance-api.loca.lt/pawapay/return';
 
       const userPhone = phone || user.phone || '2250700000000';
       const cleanPhone = userPhone.replace(/[\s\+]/g, '');
